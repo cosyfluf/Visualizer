@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Pro Visualizer</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #050505; 
+            font-family: 'Segoe UI', sans-serif; 
+            user-select: none; 
+            color: #eee; 
+        }
+
+        #container { 
+            width: 100%; 
+            height: 100vh; 
+            position: relative; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-end; 
+        }
+
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+        }
+        
+        /* MEDIA INFO OVERLAY */
+        #media-overlay {
+            position: absolute;
+            display: flex; 
+            align-items: center;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 10px; 
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 350px; 
+            opacity: 0;
+            transition: opacity 1s ease, top 0.5s, left 0.5s, right 0.5s, bottom 0.5s;
+            z-index: 10;
+        }
+        
+        .pos-tl { top: 20px; left: 20px; bottom: auto; right: auto; }
+        .pos-tr { top: 20px; right: 20px; bottom: auto; left: auto; flex-direction: row-reverse; text-align: right; }
+        .pos-bl { bottom: 20px; left: 20px; top: auto; right: auto; }
+        .pos-br { bottom: 20px; right: 20px; top: auto; left: auto; flex-direction: row-reverse; text-align: right; }
+
+        .pos-tr #media-cover, .pos-br #media-cover { margin-right: 0; margin-left: 12px; }
+
+        #media-cover {
+            width: 60px; height: 60px;
+            border-radius: 6px; 
+            object-fit: cover;
+            margin-right: 12px; 
+            background: #222;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            display: none; 
+        }
+
+        #media-text { display: flex; flex-direction: column; overflow: hidden; }
+        #media-title { font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; margin-bottom: 2px; }
+        #media-artist { font-size: 12px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* MENU BUTTON */
+        #menu-btn {
+            position: absolute; top: 15px; right: 15px;
+            font-size: 24px; cursor: pointer; color: rgba(255,255,255,0.3);
+            z-index: 50; padding: 5px; transition: color 0.3s;
+        }
+        #menu-btn:hover { color: white; }
+
+        /* SETTINGS OVERLAY */
+        #settings-modal {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid #444;
+            padding: 25px; border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column; gap: 15px;
+            width: 320px; z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        #settings-modal h2 { margin: 0 0 10px 0; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; }
+        .setting-col { display: flex; flex-direction: column; gap: 5px; margin-bottom: 5px; }
+
+        select, input[type=range] { background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; outline: none; }
+        
+        button#save-btn {
+            margin-top: 10px; background: #0575E6; border: none; color: white; 
+            padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+        button#save-btn:hover { background: #00F260; color: #000; }
+        
+        /* LOG CONSOLE */
+        #console-overlay {
+            position: absolute; top: 50px; left: 50px; right: 50px; bottom: 50px;
+            background-color: rgba(10, 10, 10, 0.95); border: 1px solid #333; border-radius: 8px;
+            z-index: 9999; display: none; flex-direction: column; font-family: monospace;
+            backdrop-filter: blur(5px);
+        }
+        #console-body { flex: 1; padding: 10px; overflow-y: auto; font-size: 12px; }
+        
+        #status { position: absolute; bottom: 10px; left: 15px; color: #444; font-size: 11px; z-index: 5; }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <!-- Media Info -->
+        <div id="media-overlay" class="pos-tl">
+            <img id="media-cover" src="" alt="Cover">
+            <div id="media-text">
+                <div id="media-title"></div>
+                <div id="media-artist"></div>
+            </div>
+        </div>
+
+        <div id="menu-btn" onclick="toggleSettings()">&#8942;</div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal">
+            <h2>Einstellungen</h2>
+            
+            <div class="setting-row">
+                <label>Style:</label>
+                <select id="style-select" onchange="changeStyle(this.value)">
+                    <option value="neon">Neon Flow</option>
+                    <option value="kitt">K.I.T.T.</option>
+                    <option value="led">LED Matrix</option>
+                    <option value="vu">Analog VU Meter</option>
+                    <option value="magiceye">Magisches Auge</option>
+                    <option value="synthwave">Synthwave 80s</option>
+                    <option value="HoloRenderer">Radial Gravity Core</option>
+                    <option value="nyancat">Nyan Cat</option>
+                </select>
+            </div>
+
+            <div class="setting-row">
+                <label>Gain (Gesamt):</label>
+                <input type="range" min="0.1" max="3.0" step="0.05" value="1.0" oninput="updateSens(this.value)" id="sens-slider">
+            </div>
+
+            <div class="setting-row">
+                <label>Info Position:</label>
+                <select id="pos-select" onchange="updateMediaPos(this.value)">
+                    <option value="top-left">Oben Links</option>
+                    <option value="top-right">Oben Rechts</option>
+                    <option value="bottom-left">Unten Links</option>
+                    <option value="bottom-right">Unten Rechts</option>
+                </select>
+            </div>
+
+            <!-- BASS CONFIG SEKTION -->
+            <div style="border-top:1px solid #444; margin-top:5px; padding-top:10px;">
+                <div class="setting-row" style="margin-bottom:5px;">
+                    <label style="color:#ddd; font-weight:bold;">Bass-Meter Config</label>
+                    <span id="hz-display" style="font-size:11px; color:#0f8; font-family:monospace;">30Hz - 80Hz</span>
+                </div>
+
+                <div class="setting-col">
+                    <div class="setting-row">
+                        <label style="font-size:12px; color:#aaa;">Bass Gain (Empfindl.):</label>
+                        <span id="bass-sens-display" style="font-size:11px; color:#666;">1.2</span>
+                    </div>
+                    <input type="range" min="0.5" max="5.0" step="0.1" value="1.2" oninput="updateBassSens(this.value)" id="bass-sens-slider">
+                </div>
+
+                <div class="setting-col">
+                    <div class="setting-row">
+                        <label style="font-size:12px; color:#aaa;">Start-Frequenz (Offset):</label>
+                    </div>
+                    <input type="range" min="0" max="40" step="1" value="0" oninput="updateBassOffset(this.value)" id="bass-offset-slider">
+                </div>
+
+                <div class="setting-col">
+                    <div class="setting-row">
+                        <label style="font-size:12px; color:#aaa;">Bandbreite (Range):</label>
+                        <span id="bass-val-display" style="font-size:11px; color:#666;">5</span>
+                    </div>
+                    <input type="range" min="1" max="20" step="1" value="5" oninput="updateBassRange(this.value)" id="bass-range-slider">
+                </div>
+            </div>
+
+            <button id="save-btn" onclick="saveSettings()">Speichern (Strg+S)</button>
+        </div>
+        
+        <canvas id="viz"></canvas>
+        <div id="status">Initialisiere...</div>
+
+        <!-- Log Konsole -->
+        <div id="console-overlay">
+            <div style="background:#222; padding:5px;">SYSTEM LOG [STRG+E to Close]</div>
+            <div id="console-body"></div>
+        </div>
+    </div>
+
+    <!-- EXTERNAL IMPORTS -->
+    <script src="styles/neon.js"></script>
+    <script src="styles/kitt.js"></script>
+    <script src="styles/led.js"></script>
+    <script src="styles/vu.js"></script>
+    <script src="styles/magiceye.js"></script>
+
+    <!-- MAIN APP LOGIC -->
+    <script src="app.js"></script>
+</body>
+</html>
