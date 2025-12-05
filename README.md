@@ -1,6 +1,6 @@
 # 🎵 Pro Visualizer
 
-![Project Banner](https://via.placeholder.com/1000x300/050505/00F260?text=Pro+Visualizer+by+cosyfluf)
+![Project Banner](screenshots/project-banner.png)
 
 > **A high-performance, real-time desktop audio visualizer built with Python and Web technologies.**
 
