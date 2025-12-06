@@ -45,8 +45,8 @@
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/cosyfluf/pro-visualizer.git
-cd pro-visualizer
+git clone https://github.com/cosyfluf/visualizer.git
+cd visualizer
 ```
 
 ### 2. Install Dependencies
