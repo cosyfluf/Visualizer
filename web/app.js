@@ -178,6 +178,27 @@ class HoloOrbRenderer {
         const cx = width / 2;
         const cy = height / 2;
         
+        // --- SETTINGS EINLESEN (NEU) ---
+        // Wir holen uns die Werte direkt aus den HTML Elementen
+        const elToggle = document.getElementById('particle');
+        const elIntensity = document.getElementById('particle-intensity');
+        const elThreshold = document.getElementById('particle-threshold');
+
+        // Standardwerte, falls Elemente noch nicht geladen sind
+        const particlesOn = elToggle ? elToggle.checked : true;
+        const intensityVal = elIntensity ? parseInt(elIntensity.value) : 50; // 0 bis 100
+        const thresholdVal = elThreshold ? parseInt(elThreshold.value) : 50; // 0 bis 100
+
+        // Werte umrechnen für die Logik
+        // Threshold: Slider (0-100) -> Bass-Wert (0.0 - 1.0)
+        // Je höher der Slider, desto härter muss der Bass sein.
+        // Wir mappen 0-100 auf ca 0.3 bis 0.95 range
+        const calcThreshold = 0.3 + (thresholdVal / 100) * 0.65;
+
+        // Intensity: Slider (0-100) -> Anzahl Partikel (0 bis ca 15)
+        const spawnCount = Math.floor(intensityVal / 6); 
+
+        // --- AUDIO ANALYSE ---
         let bass = 0;
         if (data.bars && data.bars.length > 0) {
             bass = data.bars.slice(0, 8).reduce((a, b) => a + b, 0) / 8;
@@ -191,29 +212,43 @@ class HoloOrbRenderer {
 
         this.colorHue = (this.colorHue + 0.2) % 360; 
         
+        // Hintergrund
         let bgGrad = ctx.createRadialGradient(cx, cy, height * 0.1, cx, cy, height);
         bgGrad.addColorStop(0, "#050a14");
         bgGrad.addColorStop(1, "#000000");
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
 
-        if (bass > 0.6) {
-            for (let i = 0; i < 3; i++) {
-                let angle = Math.random() * Math.PI * 2;
-                this.particles.push({
-                    x: cx, y: cy,
-                    vx: Math.cos(angle) * (2 + Math.random() * 5),
-                    vy: Math.sin(angle) * (2 + Math.random() * 5),
-                    life: 1.0, size: Math.random() * 3 + 1,
-                    hue: this.colorHue + (Math.random() * 40 - 20)
-                });
+        // --- PARTIKEL LOGIK (ANGEPASST) ---
+        // Nur ausführen, wenn Toggle AN ist
+        if (particlesOn) {
+            // Spawn basierend auf Slider-Werten
+            if (bass > calcThreshold) {
+                // Anzahl basierend auf Intensity Slider
+                for (let i = 0; i < spawnCount; i++) {
+                    let angle = Math.random() * Math.PI * 2;
+                    // Geschwindigkeit variieren
+                    let speedMult = 2 + (Math.random() * 5); 
+                    
+                    this.particles.push({
+                        x: cx, y: cy,
+                        vx: Math.cos(angle) * speedMult,
+                        vy: Math.sin(angle) * speedMult,
+                        life: 1.0, 
+                        size: Math.random() * 3 + 1,
+                        hue: this.colorHue + (Math.random() * 40 - 20)
+                    });
+                }
+            }
+            
+            // Shockwaves auch nur wenn AN und Bass sehr stark (Threshold + ein bisschen extra)
+            if (bass > (calcThreshold + 0.1) && this.shockwaves.length < 3) {
+                this.shockwaves.push({ r: 50, opacity: 1.0 });
             }
         }
-        
-        if (bass > 0.85 && this.shockwaves.length < 3) {
-            this.shockwaves.push({ r: 50, opacity: 1.0 });
-        }
 
+        // --- PARTIKEL ZEICHNEN ---
+        // (Wird immer ausgeführt, damit existierende Partikel ausfaden, auch wenn man ausschaltet)
         this.particles.forEach((p, index) => {
             p.x += p.vx; p.y += p.vy; p.life -= 0.02; 
             if (p.life <= 0) { this.particles.splice(index, 1); } else {
@@ -223,6 +258,7 @@ class HoloOrbRenderer {
             }
         });
 
+        // Shockwaves zeichnen
         ctx.lineWidth = 3;
         this.shockwaves.forEach((sw, index) => {
             sw.r += 10 + (bass * 5); sw.opacity -= 0.04;
@@ -234,6 +270,7 @@ class HoloOrbRenderer {
         });
         ctx.globalAlpha = 1.0;
 
+        // --- VISUALIZER BARS (RESTLICHER CODE) ---
         const barsToDraw = 64; 
         const radius = (height * 0.15) + (bass * 30); 
         
@@ -265,6 +302,7 @@ class HoloOrbRenderer {
         }
         ctx.restore();
 
+        // --- KERN ---
         ctx.save();
         let coreRadius = (height * 0.08) + (bass * 20);
         let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius);

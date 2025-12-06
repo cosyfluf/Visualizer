@@ -3,14 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <title>Pro Visualizer</title>
-    <style>
+  <style>
+        :root {
+            --bg-color: #050505;
+            --modal-bg: #121212;
+            --panel-bg: #1e1e1e;
+            --accent-blue: #0078d7;
+            --text-main: #eeeeee;
+            --text-muted: #888888;
+            --border-color: #333333;
+        }
+
         body { 
             margin: 0; 
             overflow: hidden; 
-            background-color: #050505; 
-            font-family: 'Segoe UI', sans-serif; 
+            background-color: var(--bg-color); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             user-select: none; 
-            color: #eee; 
+            color: var(--text-main); 
         }
 
         #container { 
@@ -22,50 +32,51 @@
             align-items: flex-end; 
         }
 
-        canvas { 
-            width: 100%; 
-            height: 100%; 
-            display: block; 
-        }
-        
-        /* MEDIA INFO OVERLAY */
+        canvas { width: 100%; height: 100%; display: block; }
+
+        /* --- MEDIA INFO --- */
         #media-overlay {
-            position: absolute;
-            display: flex; 
-            align-items: center;
-            background: rgba(20, 20, 20, 0.6);
-            backdrop-filter: blur(8px);
-            padding: 10px; 
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-            max-width: 350px; 
-            opacity: 0;
-            transition: opacity 1s ease, top 0.5s, left 0.5s, right 0.5s, bottom 0.5s;
+            position: absolute; display: flex; align-items: center;
+            background: rgba(30, 30, 30, 0.7); backdrop-filter: blur(10px);
+            padding: 10px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+            max-width: 350px; opacity: 0;
+            transition: opacity 1s ease; 
             z-index: 10;
         }
-        
-        .pos-tl { top: 20px; left: 20px; bottom: auto; right: auto; }
-        .pos-tr { top: 20px; right: 20px; bottom: auto; left: auto; flex-direction: row-reverse; text-align: right; }
-        .pos-bl { bottom: 20px; left: 20px; top: auto; right: auto; }
-        .pos-br { bottom: 20px; right: 20px; top: auto; left: auto; flex-direction: row-reverse; text-align: right; }
 
+        /* POSITION FIX: Reset unused coords with 'auto' */
+        .pos-tl { 
+            top: 20px; left: 20px; 
+            bottom: auto; right: auto; 
+            flex-direction: row; text-align: left; 
+        }
+        .pos-tr { 
+            top: 20px; right: 20px; 
+            bottom: auto; left: auto; 
+            flex-direction: row-reverse; text-align: right; 
+        }
+        .pos-bl { 
+            bottom: 20px; left: 20px; 
+            top: auto; right: auto; 
+            flex-direction: row; text-align: left; 
+        }
+        .pos-br { 
+            bottom: 20px; right: 20px; 
+            top: auto; left: auto; 
+            flex-direction: row-reverse; text-align: right; 
+        }
+        
+        /* Cover Margin Fix based on alignment */
+        .pos-tl #media-cover, .pos-bl #media-cover { margin-right: 12px; margin-left: 0; }
         .pos-tr #media-cover, .pos-br #media-cover { margin-right: 0; margin-left: 12px; }
 
-        #media-cover {
-            width: 60px; height: 60px;
-            border-radius: 6px; 
-            object-fit: cover;
-            margin-right: 12px; 
-            background: #222;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: none; 
-        }
-
+        #media-cover { width: 50px; height: 50px; border-radius: 4px; object-fit: cover; display: none; background: #222; }
         #media-text { display: flex; flex-direction: column; overflow: hidden; }
-        #media-title { font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; margin-bottom: 2px; }
+        #media-title { font-weight: 600; font-size: 14px; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #media-artist { font-size: 12px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* MENU BUTTON */
+        /* --- MENU BUTTON --- */
         #menu-btn {
             position: absolute; top: 15px; right: 15px;
             font-size: 24px; cursor: pointer; color: rgba(255,255,255,0.3);
@@ -73,48 +84,91 @@
         }
         #menu-btn:hover { color: white; }
 
-        /* SETTINGS OVERLAY */
+        /* --- MODERN SETTINGS MODAL --- */
         #settings-modal {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(20, 20, 20, 0.95);
-            border: 1px solid #444;
-            padding: 25px; border-radius: 10px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
-            display: none;
-            flex-direction: column; gap: 15px;
-            width: 320px; z-index: 100;
-            backdrop-filter: blur(10px);
+            width: 450px; height: 500px;
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            display: none; flex-direction: column;
+            z-index: 100; overflow: hidden;
         }
-        
-        #settings-modal h2 { margin: 0 0 10px 0; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .setting-row { display: flex; justify-content: space-between; align-items: center; }
-        .setting-col { display: flex; flex-direction: column; gap: 5px; margin-bottom: 5px; }
 
-        select, input[type=range] { background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; outline: none; }
-        
-        button#save-btn {
-            margin-top: 10px; background: #0575E6; border: none; color: white; 
-            padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        /* HEADER / TABS */
+        .modal-header {
+            display: flex;
+            background: #181818;
+            border-bottom: 2px solid var(--border-color);
         }
-        button#save-btn:hover { background: #00F260; color: #000; }
-        
-        /* LOG CONSOLE */
-        #console-overlay {
-            position: absolute; top: 50px; left: 50px; right: 50px; bottom: 50px;
-            background-color: rgba(10, 10, 10, 0.95); border: 1px solid #333; border-radius: 8px;
-            z-index: 9999; display: none; flex-direction: column; font-family: monospace;
-            backdrop-filter: blur(5px);
+        .tab-btn {
+            flex: 1; padding: 15px 0;
+            background: transparent; border: none;
+            color: var(--text-muted); font-weight: 600;
+            cursor: pointer; transition: 0.2s;
+            border-bottom: 3px solid transparent;
         }
-        #console-body { flex: 1; padding: 10px; overflow-y: auto; font-size: 12px; }
-        
+        .tab-btn:hover { color: #fff; }
+        .tab-btn.active { color: #fff; border-bottom: 3px solid var(--accent-blue); }
+
+        /* CONTENT AREA */
+        .modal-content { flex: 1; overflow-y: auto; padding: 20px; }
+        .modal-content::-webkit-scrollbar { width: 6px; }
+        .modal-content::-webkit-scrollbar-track { background: #1a1a1a; }
+        .modal-content::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+        /* SECTIONS */
+        .section-group {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 15px; margin-bottom: 20px;
+        }
+        .section-title {
+            color: var(--accent-blue); font-size: 11px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px;
+        }
+
+        /* CONTROLS */
+        .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .control-row:last-child { margin-bottom: 0; }
+        .label-text { font-size: 13px; color: #ddd; }
+        .value-text { font-size: 13px; color: var(--accent-blue); font-family: monospace; min-width: 30px; text-align: right; }
+
+        /* ELEMENTS */
+        input[type=range] { -webkit-appearance: none; width: 140px; height: 4px; background: #444; border-radius: 2px; outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: #fff; border-radius: 50%; cursor: pointer; transition: 0.2s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-blue); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        select { background: #252525; color: #fff; border: 1px solid #444; padding: 5px 10px; border-radius: 4px; outline: none; font-size: 13px; }
+
+        /* FOOTER */
+        .modal-footer { padding: 15px 20px; background: #181818; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; }
+        #save-btn { background: var(--accent-blue); color: white; border: none; padding: 8px 20px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        #save-btn:hover { filter: brightness(1.2); }
+
+        /* LOGIC */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
         #status { position: absolute; bottom: 10px; left: 15px; color: #444; font-size: 11px; z-index: 5; }
+        #console-overlay { position: absolute; top: 50px; left: 50px; right: 50px; bottom: 50px; background-color: rgba(10, 10, 10, 0.95); border: 1px solid #333; border-radius: 8px; z-index: 9999; display: none; flex-direction: column; font-family: monospace; backdrop-filter: blur(5px); }
+        #console-body { flex: 1; padding: 10px; overflow-y: auto; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <div id="container">
-        <!-- Media Info -->
+        <!-- Media Overlay -->
         <div id="media-overlay" class="pos-tl">
             <img id="media-cover" src="" alt="Cover">
             <div id="media-text">
@@ -123,92 +177,195 @@
             </div>
         </div>
 
-        <div id="menu-btn" onclick="toggleSettings()">&#8942;</div>
+        <!-- Menu Button -->
+        <div id="menu-btn" onclick="toggleSettings()">&#9776;</div>
 
         <!-- Settings Modal -->
         <div id="settings-modal">
-            <h2>Einstellungen</h2>
             
-            <div class="setting-row">
-                <label>Style:</label>
-                <select id="style-select" onchange="changeStyle(this.value)">
-                    <option value="neon">Neon Flow</option>
-                    <option value="kitt">K.I.T.T.</option>
-                    <option value="led">LED Matrix</option>
-                    <option value="vu">Analog VU Meter</option>
-                    <option value="magiceye">Magisches Auge</option>
-                    <option value="synthwave">Synthwave 80s</option>
-                    <option value="HoloRenderer">Radial Gravity Core</option>
-                    <option value="nyancat">Nyan Cat</option>
-                </select>
+            <!-- Tabs Header -->
+            <div class="modal-header">
+                <button class="tab-btn" onclick="openTab('general')">General</button>
+                <button class="tab-btn" onclick="openTab('audio')">Visuals</button>
+                <button class="tab-btn active" onclick="openTab('bass')">Bass Engine</button>
             </div>
 
-            <div class="setting-row">
-                <label>Gain (Gesamt):</label>
-                <input type="range" min="0.1" max="3.0" step="0.05" value="1.0" oninput="updateSens(this.value)" id="sens-slider">
-            </div>
-
-            <div class="setting-row">
-                <label>Info Position:</label>
-                <select id="pos-select" onchange="updateMediaPos(this.value)">
-                    <option value="top-left">Oben Links</option>
-                    <option value="top-right">Oben Rechts</option>
-                    <option value="bottom-left">Unten Links</option>
-                    <option value="bottom-right">Unten Rechts</option>
-                </select>
-            </div>
-
-            <!-- BASS CONFIG SEKTION -->
-            <div style="border-top:1px solid #444; margin-top:5px; padding-top:10px;">
-                <div class="setting-row" style="margin-bottom:5px;">
-                    <label style="color:#ddd; font-weight:bold;">Bass-Meter Config</label>
-                    <span id="hz-display" style="font-size:11px; color:#0f8; font-family:monospace;">30Hz - 80Hz</span>
-                </div>
-
-                <div class="setting-col">
-                    <div class="setting-row">
-                        <label style="font-size:12px; color:#aaa;">Bass Gain (Empfindl.):</label>
-                        <span id="bass-sens-display" style="font-size:11px; color:#666;">1.2</span>
+            <!-- Scrollable Content -->
+            <div class="modal-content">
+                
+                <!-- TAB: GENERAL -->
+                <div id="tab-general" class="tab-content">
+                    <div class="section-group">
+                        <div class="section-title">Overlay Settings</div>
+                        
+                        <div class="control-row">
+                            <span class="label-text">Media Info Position</span>
+                            <select id="pos-select" onchange="updateMediaPos(this.value)">
+                                <option value="top-left">Top Left</option>
+                                <option value="top-right">Top Right</option>
+                                <option value="bottom-left">Bottom Left</option>
+                                <option value="bottom-right">Bottom Right</option>
+                            </select>
+                        </div>
                     </div>
-                    <input type="range" min="0.5" max="5.0" step="0.1" value="1.2" oninput="updateBassSens(this.value)" id="bass-sens-slider">
                 </div>
 
-                <div class="setting-col">
-                    <div class="setting-row">
-                        <label style="font-size:12px; color:#aaa;">Start-Frequenz (Offset):</label>
+                <!-- TAB: VISUALS -->
+                <div id="tab-audio" class="tab-content">
+                    <div class="section-group">
+                        <div class="section-title">Visual Style</div>
+                        <div class="control-row">
+                            <span class="label-text">Select Theme</span>
+                            <select id="style-select" onchange="changeStyle(this.value)">
+                                <option value="neon">Neon Flow</option>
+                                <option value="kitt">K.I.T.T.</option>
+                                <option value="led">LED Matrix</option>
+                                <option value="vu">Analog VU</option>
+                                <option value="magiceye">Magic Eye</option>
+                                <option value="synthwave">Synthwave 80s</option>
+                                <option value="HoloRenderer">Gravity Core</option>
+                                <option value="nyancat">Nyan Cat</option>
+                            </select>
+                        </div>
                     </div>
-                    <input type="range" min="0" max="40" step="1" value="0" oninput="updateBassOffset(this.value)" id="bass-offset-slider">
+
+                    <div class="section-group">
+                        <div class="section-title">Global Audio</div>
+                        <div class="control-row">
+                            <span class="label-text">Master Gain</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="range" min="0.1" max="3.0" step="0.05" value="1.0" oninput="updateLabel('lbl-gain', this.value); updateSens(this.value)" id="sens-slider">
+                                <span id="lbl-gain" class="value-text">1.0</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="setting-col">
-                    <div class="setting-row">
-                        <label style="font-size:12px; color:#aaa;">Bandbreite (Range):</label>
-                        <span id="bass-val-display" style="font-size:11px; color:#666;">5</span>
+                <!-- TAB: BASS ENGINE -->
+                <div id="tab-bass" class="tab-content active">
+                    
+                    <!-- BASS DETECTION -->
+                    <div class="section-group">
+                        <div class="section-title">Bass Detection</div>
+                        
+                        <div class="control-row">
+                            <span class="label-text">Sensitivity</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="range" min="0.5" max="5.0" step="0.1" value="1.2" id="bass-sens-slider" oninput="updateLabel('lbl-bsens', this.value); updateBassSens(this.value)">
+                                <span id="lbl-bsens" class="value-text">1.2</span>
+                            </div>
+                        </div>
+
+                        <div class="control-row">
+                            <span class="label-text">Freq Range</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="range" min="1" max="20" step="1" value="5" id="bass-range-slider" oninput="updateLabel('lbl-brange', this.value); updateBassRange(this.value)">
+                                <span id="lbl-brange" class="value-text">5</span>
+                            </div>
+                        </div>
+
+                        <div class="control-row">
+                            <span class="label-text">Offset</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="range" min="0" max="40" step="1" value="0" id="bass-offset-slider" oninput="updateLabel('lbl-boffset', this.value); updateBassOffset(this.value)">
+                                <span id="lbl-boffset" class="value-text">0</span>
+                            </div>
+                        </div>
                     </div>
-                    <input type="range" min="1" max="20" step="1" value="5" oninput="updateBassRange(this.value)" id="bass-range-slider">
+
+                    <!-- EFFECTS -->
+                    <div class="section-group">
+                        <div class="section-title">Effects</div>
+                        
+                        <div class="control-row">
+                            <span class="label-text">Visual Pulse</span>
+                            <label class="switch">
+                                <input type="checkbox" id="chk-pulse" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="control-row">
+                            <span class="label-text">Particle</span>
+                            <label class="switch">
+                                <input type="checkbox" id="particle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Particle PROPERTIES -->
+                    <div class="section-group">
+                        <div class="section-title">Particle Properties</div>
+                        
+                        <div class="control-row">
+                            <span class="label-text">Threshold</span>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="range" min="0" max="100" value="20" id="particle-threshold" oninput="updateLabel('lbl-sthresh', this.value)">
+                                <span id="lbl-sthresh" class="value-text">20</span>
+                            </div>
+                        </div>
+
+                    <div class="control-row">
+                      <span class="label-text">Intensity</span>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <input type="range" min="0" max="100" step="1" value="50" id="particle-intensity" oninput="updateLabel('lbl-sint', this.value)">
+                        <span id="lbl-sint" class="value-text">50</span>
+                      </div>
+                     </div>
+                    </div>
+
                 </div>
+
             </div>
 
-            <button id="save-btn" onclick="saveSettings()">Speichern (Strg+S)</button>
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button id="save-btn" onclick="saveSettings()">Save Settings</button>
+            </div>
         </div>
-        
+
         <canvas id="viz"></canvas>
         <div id="status">Initialisiere...</div>
-
-        <!-- Log Konsole -->
+        
+        <!-- Log Console -->
         <div id="console-overlay">
             <div style="background:#222; padding:5px;">SYSTEM LOG [STRG+E to Close]</div>
             <div id="console-body"></div>
         </div>
     </div>
-
     <!-- EXTERNAL IMPORTS -->
     <script src="styles/neon.js"></script>
     <script src="styles/kitt.js"></script>
     <script src="styles/led.js"></script>
     <script src="styles/vu.js"></script>
     <script src="styles/magiceye.js"></script>
+     <script>
+        // --- UI UTILS ---
+        function toggleSettings() {
+            const modal = document.getElementById('settings-modal');
+            modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+        }
 
+        function openTab(tabName) {
+            // Hide all
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // Show target
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Highlight button
+            const btns = document.querySelectorAll('.tab-btn');
+            if(tabName === 'general') btns[0].classList.add('active');
+            if(tabName === 'audio') btns[1].classList.add('active');
+            if(tabName === 'bass') btns[2].classList.add('active');
+        }
+
+        function updateLabel(id, val) {
+            document.getElementById(id).innerText = val;
+        }
+    </script>
     <!-- MAIN APP LOGIC -->
     <script src="app.js"></script>
 </body>
