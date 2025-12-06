@@ -2,8 +2,11 @@
     "device_id": 6,
     "style": "HoloRenderer",
     "sensitivity": 0.1,
-    "media_position": "top-left",
+    "media_position": "bottom-left",
     "bass_range": 1,
     "bass_offset": 0,
-    "bass_sens": 1.2
+    "bass_sens": 1.2,
+    "particle_enabled": true,
+    "particle_threshold": 20,
+    "particle_intensity": 50
 }

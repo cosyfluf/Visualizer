@@ -493,7 +493,7 @@ const renderers = {
     'nyancat': new NyanCatRenderer()
 };
 
-let currentRenderer = renderers['neon'];
+let currentRenderer = renderers['HoloRenderer'];
 
 // --- HERTZ RECHNER ---
 function calculateHz(barIndex) {
@@ -563,31 +563,35 @@ function updateBassSens(val) {
 }
 
 // --- INIT & SAVE ---
-function applyConfig(style, sens, pos, bassRange, bassOffset, bassSens) {
+// app.js
+function applyConfig(style, sens, pos, bassRange, bassOffset, bassSens, pEnabled, pThresh, pInt) {
     changeStyle(style);
     updateSens(sens);
     updateMediaPos(pos || 'top-left');
     updateBassRange(bassRange || 5);
     updateBassOffset(bassOffset || 0);
-    updateBassSens(bassSens || 1.2); 
-    addLog('INFO', `Config geladen.`);
-}
+    updateBassSens(bassSens || 1.2);
 
-function saveSettings() {
-    if(window.pywebview) {
-        window.pywebview.api.save_settings(
-            currentStyleName, 
-            sensitivity, 
-            mediaPosition, 
-            bassRangeSetting, 
-            bassOffsetSetting,
-            bassSensSetting 
-        );
-        addLog('INFO', 'Gespeichert.');
-        const btn = document.getElementById('save-btn');
-        const old = btn.innerText; btn.innerText = "OK!";
-        setTimeout(() => btn.innerText = old, 1000);
+    // --- NEU: Partikel Werte setzen ---
+    // Toggle
+    const elToggle = document.getElementById('particle');
+    if(elToggle) elToggle.checked = pEnabled;
+    
+    // Threshold
+    const elThresh = document.getElementById('particle-threshold');
+    if(elThresh) {
+        elThresh.value = pThresh;
+        updateLabel('lbl-sthresh', pThresh);
     }
+
+    // Intensity
+    const elInt = document.getElementById('particle-intensity');
+    if(elInt) {
+        elInt.value = pInt;
+        updateLabel('lbl-sint', pInt);
+    }
+    
+    addLog('INFO', `Config geladen.`);
 }
 
 // --- DATA LOOP ---
@@ -674,6 +678,29 @@ function addLog(lvl, msg) {
     const row = document.createElement('div');
     row.innerHTML = `<span style="color:${lvl==='ERROR'?'#f55':'#0f8'}">[${lvl}]</span> ${msg}`;
     document.getElementById('console-body').appendChild(row);
+}
+function saveSettings() {
+    if(window.pywebview) {
+        // Werte aus dem DOM lesen
+        const pEnabled = document.getElementById('particle').checked;
+        const pThresh = document.getElementById('particle-threshold').value;
+        const pInt = document.getElementById('particle-intensity').value;
+
+        window.pywebview.api.save_settings(
+            currentStyleName, 
+            sensitivity, 
+            mediaPosition, 
+            bassRangeSetting, 
+            bassOffsetSetting,
+            bassSensSetting,
+            // --- NEU SENDEN ---
+            pEnabled,
+            pThresh,
+            pInt
+        );
+        addLog('INFO', 'Gespeichert.');
+        // ... button animation ...
+    }
 }
 function setStatus(txt) { document.getElementById('status').innerText = txt; }
 

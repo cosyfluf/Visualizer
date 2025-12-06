@@ -17,7 +17,7 @@ import warnings
 # ==========================================
 warnings.filterwarnings("ignore")
 IS_CLOSING = False
-window = None  # Globale Referenz
+window = None
 
 # Versuch Windows Media Import
 try:
@@ -35,7 +35,10 @@ DEFAULT_CONFIG = {
     "media_position": "top-left",
     "bass_range": 5,
     "bass_offset": 0,
-    "bass_sens": 1.2
+    "bass_sens": 1.2,
+    "particle_enabled": True,
+    "particle_threshold": 50,
+    "particle_intensity": 50
 }
 
 class ConfigManager:
@@ -60,26 +63,20 @@ class ConfigManager:
 config = ConfigManager.load()
 
 # ==========================================
-# SICHERES LOGGING (Ohne Stdout-Redirect)
+# LOGGING
 # ==========================================
 def log_to_ui(level, message):
-    """Schreibt ins Terminal UND sendet sicher an die UI."""
     try:
-        # 1. Terminal Ausgabe (immer sicher)
         print(f"[{level}] {message}")
-        
-        # 2. UI Ausgabe (nur wenn Fenster bereit)
         global window
         if window and not IS_CLOSING:
             safe_msg = json.dumps(str(message))
-            # setTimeout verhindert Blockaden im JS Thread
             js_code = f"setTimeout(function() {{ if(typeof addLog === 'function') addLog('{level}', {safe_msg}); }}, 0);"
             window.evaluate_js(js_code)
-    except:
-        pass
+    except: pass
 
 # ==========================================
-# MEDIA FETCHER
+# MEDIA FETCHER (Windows)
 # ==========================================
 class MediaFetcher:
     def __init__(self):
@@ -144,19 +141,23 @@ class JsApi:
             try: window.toggle_fullscreen()
             except: pass
 
-    def save_settings(self, style, sensitivity, media_pos, bass_range, bass_offset, bass_sens):
-        log_to_ui("INFO", f"Save: {style}, Gain:{sensitivity}")
+    def save_settings(self, style, sensitivity, media_pos, bass_range, bass_offset, bass_sens, p_enabled, p_thresh, p_int):
+        log_to_ui("INFO", f"Config gespeichert.")
+        is_p_enabled = str(p_enabled).lower() == 'true'
         ConfigManager.save({
             "style": style,
             "sensitivity": float(sensitivity),
             "media_position": media_pos,
             "bass_range": int(bass_range),
             "bass_offset": int(bass_offset),
-            "bass_sens": float(bass_sens)
+            "bass_sens": float(bass_sens),
+            "particle_enabled": is_p_enabled,
+            "particle_threshold": int(p_thresh),
+            "particle_intensity": int(p_int)
         })
 
 # ==========================================
-# AUDIO ENGINE
+# AUDIO ENGINE (Optimiert für Mic & Loopback)
 # ==========================================
 class AudioEngine:
     def __init__(self, device_id):
@@ -164,7 +165,7 @@ class AudioEngine:
 
     def run(self):
         global window
-        time.sleep(1.0) # Warten bis UI geladen ist
+        time.sleep(1.0) 
         
         SAMPLE_RATE = 44100
         BLOCK_SIZE = 2048 
@@ -173,25 +174,49 @@ class AudioEngine:
         MAX_FREQ = 15000
 
         try:
+            # WICHTIG: include_loopback=True holt Mics UND PC-Sound
             mics = sc.all_microphones(include_loopback=True)
+            
             if self.device_id >= len(mics): mic = mics[0]
             else: mic = mics[self.device_id]
             
-            # Init Frontend Config senden
+            # Init Config an UI senden
             try:
                 if not IS_CLOSING and window:
                     safe_name = mic.name.replace('"', '').replace("'", "")
                     cfg = config
+                    
+                    p_en = "true" if cfg.get('particle_enabled', True) else "false"
+                    p_thr = cfg.get('particle_threshold', 50)
+                    p_int = cfg.get('particle_intensity', 50)
+
                     init_script = f"""
                         setTimeout(() => {{
                             if(typeof setStatus === 'function') setStatus("Verbunden: {safe_name}");
-                            if(typeof applyConfig === 'function') applyConfig('{cfg.get('style','neon')}', {cfg.get('sensitivity',1.0)}, '{cfg.get('media_position','top-left')}', {cfg.get('bass_range',5)}, {cfg.get('bass_offset',0)}, {cfg.get('bass_sens',1.2)});
+                            if(typeof applyConfig === 'function') {{
+                                applyConfig(
+                                    '{cfg.get('style','neon')}', 
+                                    {cfg.get('sensitivity',1.0)}, 
+                                    '{cfg.get('media_position','top-left')}', 
+                                    {cfg.get('bass_range',5)}, 
+                                    {cfg.get('bass_offset',0)}, 
+                                    {cfg.get('bass_sens',1.2)},
+                                    {p_en}, 
+                                    {p_thr}, 
+                                    {p_int}
+                                );
+                            }}
                         }}, 200);
                     """
                     window.evaluate_js(init_script)
             except: pass
 
             log_to_ui("INFO", f"Audio gestartet: {mic.name}")
+            
+            # Bestimmung ob es wahrscheinlich ein Mikrofon ist (oft leiser)
+            is_probably_mic = "loopback" not in mic.name.lower()
+            # Wenn Mic, dann das Signal etwas verstärken (Software Pre-Amp)
+            mic_boost = 3.0 if is_probably_mic else 1.0
 
             with mic.recorder(samplerate=SAMPLE_RATE) as recorder:
                 while not IS_CLOSING:
@@ -203,15 +228,24 @@ class AudioEngine:
                         time.sleep(0.01)
                         continue
 
-                    # Stereo zu Mono & Kanäle trennen
-                    if data.shape[1] >= 2:
+                    # Anpassung an Mono/Stereo
+                    # Wenn das Mikrofon Mono ist, hat es shape (2048, 1) oder (2048,)
+                    if len(data.shape) > 1 and data.shape[1] >= 2:
+                        # Stereo Quelle (z.B. Loopback)
                         mono_mix = (data[:, 0] + data[:, 1]) / 2
-                        left_channel = data[:, 0]; right_channel = data[:, 1]
+                        left_channel = data[:, 0]
+                        right_channel = data[:, 1]
                     else:
-                        mono_mix = data[:, 0]
-                        left_channel = data[:, 0]; right_channel = data[:, 0]
-                    
-                    # FFT
+                        # Mono Quelle (z.B. echtes Mikrofon)
+                        # Wir simulieren Stereo für die Anzeige
+                        if len(data.shape) > 1:
+                            mono_mix = data[:, 0]
+                        else:
+                            mono_mix = data
+                        left_channel = mono_mix
+                        right_channel = mono_mix
+
+                    # FFT Berechnung
                     fft_data = np.abs(np.fft.rfft(mono_mix * np.hanning(len(mono_mix))))
                     freqs = np.fft.rfftfreq(BLOCK_SIZE, 1/SAMPLE_RATE)
                     
@@ -226,12 +260,16 @@ class AudioEngine:
                         
                         chunk = fft_data[idx_start:idx_end] if idx_end <= len(fft_data) else fft_data[idx_start:]
                         val = np.mean(chunk) if len(chunk) > 0 else 0
-                        val = val * (50 + (i * 3))
+                        
+                        # Apply Mic Boost hier
+                        val = val * (50 + (i * 3)) * mic_boost
+
                         if val > 100: val = 100 + (val - 100) * 0.2
                         output_bars.append(float(val))
 
-                    rms_l = np.sqrt(np.mean(left_channel**2))
-                    rms_r = np.sqrt(np.mean(right_channel**2))
+                    # Volume Berechnung (RMS) mit Boost
+                    rms_l = np.sqrt(np.mean(left_channel**2)) * mic_boost
+                    rms_r = np.sqrt(np.mean(right_channel**2)) * mic_boost
                     
                     payload = {
                         "bars": output_bars,
@@ -251,35 +289,65 @@ class AudioEngine:
                 log_to_ui("ERROR", f"Audio Error: {e}")
                 print(e)
 
-def start_backend():
-    global chosen_id
-    t1 = threading.Thread(target=lambda: AudioEngine(chosen_id).run(), daemon=True)
-    t2 = threading.Thread(target=start_media_thread, daemon=True)
-    t1.start()
-    t2.start()
-
+# ==========================================
+# DEVICE SELECTION
+# ==========================================
 def select_device():
-    last_id = config.get("device_id", -1)
+    """Zeigt alle Geräte (Mics & Loopback) und lässt den User wählen."""
     try:
         devices = sc.all_microphones(include_loopback=True)
-    except: return 0
+    except: 
+        print("Keine Audiogeräte gefunden!")
+        return 0
     
-    if last_id != -1 and last_id < len(devices):
-        print(f"--- AUTO-START: {devices[last_id].name} (1s) ---")
-        time.sleep(1) 
-        return last_id
+    last_id = config.get("device_id", -1)
+    
+    print("\n" + "="*40)
+    print("   AUDIO INPUT SETUP")
+    print("="*40)
+    print(" HINWEIS: 'Loopback' ist PC-Sound.")
+    print("          Andere sind meist Mikrofone.")
+    print("-" * 40)
 
-    print("\n--- AUDIO SETUP ---")
+    # Liste anzeigen
     for i, dev in enumerate(devices):
-        try: print(f"[{i}] {dev.name}")
-        except: pass
+        marker = " "
+        type_label = "[MIC]  "
+        if "loopback" in dev.name.lower():
+            type_label = "[SYS]  " # System Sound
+        
+        if i == last_id:
+            marker = "*"
+        
+        print(f" {marker} [{i}] {type_label} {dev.name}")
     
+    print("-" * 40)
+    
+    # Auto-Select Logik mit Abbruch-Möglichkeit
+    if last_id != -1 and last_id < len(devices):
+        print(f"Auto-Start mit ID {last_id} in 3 Sekunden...")
+        print("Drücke STRG+C, um abzubrechen und neu zu wählen (im Terminal).")
+        try:
+            # Einfacher Countdown ohne Blocking Input für Interrupt
+            for k in range(3):
+                time.sleep(1)
+                print(f"...", end=" ", flush=True)
+            print("\nStart!")
+            return last_id
+        except KeyboardInterrupt:
+            print("\nAuto-Start abgebrochen. Bitte wählen:")
+
     while True:
         try:
-            val = int(input("ID wählen >> "))
-            ConfigManager.save({"device_id": val})
-            return val
-        except: pass
+            val_str = input("ID eingeben >> ")
+            val = int(val_str)
+            if 0 <= val < len(devices):
+                ConfigManager.save({"device_id": val})
+                return val
+            else:
+                print("Ungültige ID.")
+        except ValueError:
+            print("Bitte eine Zahl eingeben.")
 
 def on_closed():
     global IS_CLOSING
@@ -287,17 +355,23 @@ def on_closed():
     print("App wird beendet...")
     os._exit(0)
 
+def start_backend():
+    global chosen_id
+    t1 = threading.Thread(target=lambda: AudioEngine(chosen_id).run(), daemon=True)
+    t2 = threading.Thread(target=start_media_thread, daemon=True)
+    t1.start()
+    t2.start()
+
 # ==========================================
-# MAIN
+# MAIN ENTRY
 # ==========================================
 if __name__ == '__main__':
-    # Signal Handler
     def signal_handler(sig, frame): on_closed()
     signal.signal(signal.SIGINT, signal_handler)
 
+    # 1. Gerät wählen VOR dem Fensterstart
     chosen_id = select_device()
     
-    # Pfad zur HTML Datei
     if getattr(sys, 'frozen', False):
         base_dir = sys._MEIPASS
     else:
@@ -309,7 +383,6 @@ if __name__ == '__main__':
 
     api = JsApi()
     
-    # Fenster erstellen
     window = webview.create_window(
         'Pro Visualizer', 
         url=html_path,
@@ -321,9 +394,6 @@ if __name__ == '__main__':
     
     window.events.closed += on_closed
 
-    # Starten (WICHTIG: debug=False)
-    # args=(window,) ist hier nicht mehr nötig, da window global ist,
-    # aber func=start_backend braucht keine Argumente mehr in dieser Version.
     try:
         webview.start(func=start_backend, debug=False)
     except KeyboardInterrupt:
