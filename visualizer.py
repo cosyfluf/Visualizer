@@ -76,7 +76,7 @@ def log_to_ui(level, message):
     except: pass
 
 # ==========================================
-# MEDIA FETCHER (Windows)
+# MEDIA FETCHER (Windows) - OPTIMIERT
 # ==========================================
 class MediaFetcher:
     def __init__(self):
@@ -122,7 +122,8 @@ class MediaFetcher:
     async def loop(self):
         while not IS_CLOSING:
             await self.get_media_info()
-            await asyncio.sleep(2)
+            # Update-Rate auf 0.5s erhöht für schnelleres Cover-Update
+            await asyncio.sleep(0.5)
 
 def start_media_thread():
     if not WINSDK_AVAILABLE: return
@@ -157,7 +158,7 @@ class JsApi:
         })
 
 # ==========================================
-# AUDIO ENGINE (Optimiert für Mic & Loopback)
+# AUDIO ENGINE (High Performance / Low Latency)
 # ==========================================
 class AudioEngine:
     def __init__(self, device_id):
@@ -165,18 +166,17 @@ class AudioEngine:
 
     def run(self):
         global window
-        time.sleep(1.0) 
+        time.sleep(0.5) # Kurze Start-Wartezeit
         
         SAMPLE_RATE = 44100
-        BLOCK_SIZE = 2048 
+        # Kleiner Block = weniger Latenz (1024 samples ~ 23ms)
+        BLOCK_SIZE = 1024 
         NUM_BARS = 64
-        MIN_FREQ = 30
+        MIN_FREQ = 40
         MAX_FREQ = 15000
 
         try:
-            # WICHTIG: include_loopback=True holt Mics UND PC-Sound
             mics = sc.all_microphones(include_loopback=True)
-            
             if self.device_id >= len(mics): mic = mics[0]
             else: mic = mics[self.device_id]
             
@@ -211,43 +211,44 @@ class AudioEngine:
                     window.evaluate_js(init_script)
             except: pass
 
-            log_to_ui("INFO", f"Audio gestartet: {mic.name}")
+            log_to_ui("INFO", f"Audio gestartet (Low Latency): {mic.name}")
             
-            # Bestimmung ob es wahrscheinlich ein Mikrofon ist (oft leiser)
             is_probably_mic = "loopback" not in mic.name.lower()
-            # Wenn Mic, dann das Signal etwas verstärken (Software Pre-Amp)
             mic_boost = 3.0 if is_probably_mic else 1.0
+
+            # Pre-Calc Window Function für Performance
+            hanning_window = np.hanning(BLOCK_SIZE)
 
             with mic.recorder(samplerate=SAMPLE_RATE) as recorder:
                 while not IS_CLOSING:
                     if not window: break
 
                     try:
+                        # Wartet hier, bis Audio da ist (ca 23ms bei Block 1024)
                         data = recorder.record(numframes=BLOCK_SIZE)
                     except: 
-                        time.sleep(0.01)
                         continue
 
-                    # Anpassung an Mono/Stereo
-                    # Wenn das Mikrofon Mono ist, hat es shape (2048, 1) oder (2048,)
+                    # Anpassung Mono/Stereo
                     if len(data.shape) > 1 and data.shape[1] >= 2:
-                        # Stereo Quelle (z.B. Loopback)
                         mono_mix = (data[:, 0] + data[:, 1]) / 2
                         left_channel = data[:, 0]
                         right_channel = data[:, 1]
                     else:
-                        # Mono Quelle (z.B. echtes Mikrofon)
-                        # Wir simulieren Stereo für die Anzeige
-                        if len(data.shape) > 1:
-                            mono_mix = data[:, 0]
-                        else:
-                            mono_mix = data
+                        if len(data.shape) > 1: mono_mix = data[:, 0]
+                        else: mono_mix = data
                         left_channel = mono_mix
                         right_channel = mono_mix
 
-                    # FFT Berechnung
-                    fft_data = np.abs(np.fft.rfft(mono_mix * np.hanning(len(mono_mix))))
-                    freqs = np.fft.rfftfreq(BLOCK_SIZE, 1/SAMPLE_RATE)
+                    # FFT
+                    # Fallback falls Buffer kleiner als erwartet (selten)
+                    if len(mono_mix) != BLOCK_SIZE:
+                        current_window = np.hanning(len(mono_mix))
+                        fft_data = np.abs(np.fft.rfft(mono_mix * current_window))
+                    else:
+                        fft_data = np.abs(np.fft.rfft(mono_mix * hanning_window))
+                    
+                    freqs = np.fft.rfftfreq(len(mono_mix), 1/SAMPLE_RATE)
                     
                     output_bars = []
                     for i in range(NUM_BARS):
@@ -261,13 +262,11 @@ class AudioEngine:
                         chunk = fft_data[idx_start:idx_end] if idx_end <= len(fft_data) else fft_data[idx_start:]
                         val = np.mean(chunk) if len(chunk) > 0 else 0
                         
-                        # Apply Mic Boost hier
                         val = val * (50 + (i * 3)) * mic_boost
 
                         if val > 100: val = 100 + (val - 100) * 0.2
                         output_bars.append(float(val))
 
-                    # Volume Berechnung (RMS) mit Boost
                     rms_l = np.sqrt(np.mean(left_channel**2)) * mic_boost
                     rms_r = np.sqrt(np.mean(right_channel**2)) * mic_boost
                     
@@ -282,7 +281,7 @@ class AudioEngine:
                             window.evaluate_js(f"updateData('{json.dumps(payload)}')")
                     except: pass
                     
-                    time.sleep(0.01)
+                    # KEIN SLEEP HIER! Maximale Geschwindigkeit.
 
         except Exception as e:
             if not IS_CLOSING:
@@ -293,7 +292,6 @@ class AudioEngine:
 # DEVICE SELECTION
 # ==========================================
 def select_device():
-    """Zeigt alle Geräte (Mics & Loopback) und lässt den User wählen."""
     try:
         devices = sc.all_microphones(include_loopback=True)
     except: 
@@ -309,12 +307,11 @@ def select_device():
     print("          Andere sind meist Mikrofone.")
     print("-" * 40)
 
-    # Liste anzeigen
     for i, dev in enumerate(devices):
         marker = " "
         type_label = "[MIC]  "
         if "loopback" in dev.name.lower():
-            type_label = "[SYS]  " # System Sound
+            type_label = "[SYS]  " 
         
         if i == last_id:
             marker = "*"
@@ -323,12 +320,10 @@ def select_device():
     
     print("-" * 40)
     
-    # Auto-Select Logik mit Abbruch-Möglichkeit
     if last_id != -1 and last_id < len(devices):
         print(f"Auto-Start mit ID {last_id} in 3 Sekunden...")
-        print("Drücke STRG+C, um abzubrechen und neu zu wählen (im Terminal).")
+        print("Drücke STRG+C, um abzubrechen und neu zu wählen.")
         try:
-            # Einfacher Countdown ohne Blocking Input für Interrupt
             for k in range(3):
                 time.sleep(1)
                 print(f"...", end=" ", flush=True)
@@ -369,7 +364,6 @@ if __name__ == '__main__':
     def signal_handler(sig, frame): on_closed()
     signal.signal(signal.SIGINT, signal_handler)
 
-    # 1. Gerät wählen VOR dem Fensterstart
     chosen_id = select_device()
     
     if getattr(sys, 'frozen', False):

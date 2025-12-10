@@ -1,5 +1,7 @@
+// --- START OF FILE app.js ---
+
 // ==========================================
-// 1. NEUE RENDERER KLASSEN
+// 1. INLINE RENDERER CLASSES
 // ==========================================
 
 class SynthwaveRenderer {
@@ -33,6 +35,8 @@ class SynthwaveRenderer {
             bass = data.bars.slice(0, 4).reduce((a,b)=>a+b,0) / 4;
             bass /= 255; 
         }
+
+        
 
         // BG
         let bgGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
@@ -178,27 +182,27 @@ class HoloOrbRenderer {
         const cx = width / 2;
         const cy = height / 2;
         
-        // --- SETTINGS EINLESEN (NEU) ---
-        // Wir holen uns die Werte direkt aus den HTML Elementen
+        // --- READ SETTINGS ---
+        // We get values directly from HTML elements
         const elToggle = document.getElementById('particle');
         const elIntensity = document.getElementById('particle-intensity');
         const elThreshold = document.getElementById('particle-threshold');
 
-        // Standardwerte, falls Elemente noch nicht geladen sind
+        // Default values if elements are not yet loaded
         const particlesOn = elToggle ? elToggle.checked : true;
-        const intensityVal = elIntensity ? parseInt(elIntensity.value) : 50; // 0 bis 100
-        const thresholdVal = elThreshold ? parseInt(elThreshold.value) : 50; // 0 bis 100
+        const intensityVal = elIntensity ? parseInt(elIntensity.value) : 50; // 0 to 100
+        const thresholdVal = elThreshold ? parseInt(elThreshold.value) : 50; // 0 to 100
 
-        // Werte umrechnen für die Logik
-        // Threshold: Slider (0-100) -> Bass-Wert (0.0 - 1.0)
-        // Je höher der Slider, desto härter muss der Bass sein.
-        // Wir mappen 0-100 auf ca 0.3 bis 0.95 range
+        // Recalculate values for logic
+        // Threshold: Slider (0-100) -> Bass Value (0.0 - 1.0)
+        // Higher slider = harder bass required.
+        // We map 0-100 to approx 0.3 to 0.95 range
         const calcThreshold = 0.3 + (thresholdVal / 100) * 0.65;
 
-        // Intensity: Slider (0-100) -> Anzahl Partikel (0 bis ca 15)
+        // Intensity: Slider (0-100) -> Particle Count (0 to approx 15)
         const spawnCount = Math.floor(intensityVal / 6); 
 
-        // --- AUDIO ANALYSE ---
+        // --- AUDIO ANALYSIS ---
         let bass = 0;
         if (data.bars && data.bars.length > 0) {
             bass = data.bars.slice(0, 8).reduce((a, b) => a + b, 0) / 8;
@@ -212,22 +216,21 @@ class HoloOrbRenderer {
 
         this.colorHue = (this.colorHue + 0.2) % 360; 
         
-        // Hintergrund
+        // Background
         let bgGrad = ctx.createRadialGradient(cx, cy, height * 0.1, cx, cy, height);
         bgGrad.addColorStop(0, "#050a14");
         bgGrad.addColorStop(1, "#000000");
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
 
-        // --- PARTIKEL LOGIK (ANGEPASST) ---
-        // Nur ausführen, wenn Toggle AN ist
+        // --- PARTICLE LOGIC ---
         if (particlesOn) {
-            // Spawn basierend auf Slider-Werten
+            // Spawn based on Slider values
             if (bass > calcThreshold) {
-                // Anzahl basierend auf Intensity Slider
+                // Count based on Intensity Slider
                 for (let i = 0; i < spawnCount; i++) {
                     let angle = Math.random() * Math.PI * 2;
-                    // Geschwindigkeit variieren
+                    // Vary speed
                     let speedMult = 2 + (Math.random() * 5); 
                     
                     this.particles.push({
@@ -241,14 +244,13 @@ class HoloOrbRenderer {
                 }
             }
             
-            // Shockwaves auch nur wenn AN und Bass sehr stark (Threshold + ein bisschen extra)
+            // Shockwaves only if ON and bass is very strong
             if (bass > (calcThreshold + 0.1) && this.shockwaves.length < 3) {
                 this.shockwaves.push({ r: 50, opacity: 1.0 });
             }
         }
 
-        // --- PARTIKEL ZEICHNEN ---
-        // (Wird immer ausgeführt, damit existierende Partikel ausfaden, auch wenn man ausschaltet)
+        // --- DRAW PARTICLES ---
         this.particles.forEach((p, index) => {
             p.x += p.vx; p.y += p.vy; p.life -= 0.02; 
             if (p.life <= 0) { this.particles.splice(index, 1); } else {
@@ -258,7 +260,7 @@ class HoloOrbRenderer {
             }
         });
 
-        // Shockwaves zeichnen
+        // Draw Shockwaves
         ctx.lineWidth = 3;
         this.shockwaves.forEach((sw, index) => {
             sw.r += 10 + (bass * 5); sw.opacity -= 0.04;
@@ -270,7 +272,7 @@ class HoloOrbRenderer {
         });
         ctx.globalAlpha = 1.0;
 
-        // --- VISUALIZER BARS (RESTLICHER CODE) ---
+        // --- VISUALIZER BARS ---
         const barsToDraw = 64; 
         const radius = (height * 0.15) + (bass * 30); 
         
@@ -302,7 +304,7 @@ class HoloOrbRenderer {
         }
         ctx.restore();
 
-        // --- KERN ---
+        // --- CORE ---
         ctx.save();
         let coreRadius = (height * 0.08) + (bass * 20);
         let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius);
@@ -479,7 +481,7 @@ resize();
 // Fallback Renderers
 class DummyRenderer { draw(ctx){} }
 
-// RENDERER REGISTRIERUNG
+// RENDERER REGISTRATION
 const renderers = {
     'neon': (typeof NeonRenderer !== 'undefined') ? new NeonRenderer() : new DummyRenderer(),
     'kitt': (typeof KittRenderer !== 'undefined') ? new KittRenderer() : new DummyRenderer(),
@@ -487,15 +489,19 @@ const renderers = {
     'vu':   (typeof VuRenderer !== 'undefined')   ? new VuRenderer() : new DummyRenderer(),
     'magiceye': (typeof MagicEyeRenderer !== 'undefined') ? new MagicEyeRenderer() : new DummyRenderer(),
     
-    // Die neuen Klassen aus dieser Datei
+    // Classes defined in this file
     'synthwave': new SynthwaveRenderer(),
     'HoloRenderer': new HoloOrbRenderer(),
-    'nyancat': new NyanCatRenderer()
+    'nyancat': new NyanCatRenderer(),
+
+    // Class from styles/laser.js
+    'lasershow': (typeof LaserShowRenderer !== 'undefined') ? new LaserShowRenderer() : new DummyRenderer(),
+    'metal': (typeof MetalShowRenderer !== 'undefined') ? new MetalShowRenderer() : new DummyRenderer()
 };
 
 let currentRenderer = renderers['HoloRenderer'];
 
-// --- HERTZ RECHNER ---
+// --- HERTZ CALCULATOR ---
 function calculateHz(barIndex) {
     if(barIndex < 0) barIndex = 0;
     if(barIndex > 64) barIndex = 64;
@@ -520,7 +526,7 @@ function changeStyle(name) {
         document.getElementById('container').style.webkitBoxReflect = 
             (name === 'neon') ? 'below 0px linear-gradient(transparent, transparent, rgba(0,0,0,0.3))' : 'none';
     } else {
-        addLog("ERROR", "Renderer nicht gefunden: " + name);
+        addLog("ERROR", "Renderer not found: " + name);
     }
 }
 
@@ -563,7 +569,6 @@ function updateBassSens(val) {
 }
 
 // --- INIT & SAVE ---
-// app.js
 function applyConfig(style, sens, pos, bassRange, bassOffset, bassSens, pEnabled, pThresh, pInt) {
     changeStyle(style);
     updateSens(sens);
@@ -572,7 +577,7 @@ function applyConfig(style, sens, pos, bassRange, bassOffset, bassSens, pEnabled
     updateBassOffset(bassOffset || 0);
     updateBassSens(bassSens || 1.2);
 
-    // --- NEU: Partikel Werte setzen ---
+    // Set Particle Values
     // Toggle
     const elToggle = document.getElementById('particle');
     if(elToggle) elToggle.checked = pEnabled;
@@ -591,7 +596,7 @@ function applyConfig(style, sens, pos, bassRange, bassOffset, bassSens, pEnabled
         updateLabel('lbl-sint', pInt);
     }
     
-    addLog('INFO', `Config geladen.`);
+    addLog('INFO', `Config loaded.`);
 }
 
 // --- DATA LOOP ---
@@ -604,39 +609,39 @@ function updateData(jsonStr) {
             let target = parsed.bars[i] * sensitivity;
             if(target > 100) target = 100;
 
-            // --- PHYSIK EINSTELLUNGEN ---
+            // --- PHYSICS SETTINGS ---
             let attack, decay;
 
-            // Bereich für das BASS-METER (Index 0 bis 8)
+            // BASS METER Range (Index 0 to 8)
             if (i < 8) { 
                 attack = 0.95;  
                 decay = 15.0;   
             } 
-            // TIEFE MITTEN (Übergang)
+            // LOW MIDS (Transition)
             else if (i < 20) {
                 attack = 0.5;
                 decay = 5.0;
             } 
-            // HÖHEN (Weicher)
+            // HIGHS (Softer)
             else {
                 attack = 0.3;   
                 decay = 2.0;    
             }
 
-            // Physik berechnen
+            // Calculate Physics
             if(target > audioData.bars[i]) {
-                // Nadel geht hoch (Attack)
+                // Needle rises (Attack)
                 audioData.bars[i] += (target - audioData.bars[i]) * attack; 
             } else {
-                // Nadel fällt (Decay)
+                // Needle falls (Decay)
                 audioData.bars[i] -= decay; 
             }
             
-            // Begrenzung nach unten
+            // Limit bottom
             if(audioData.bars[i] < 0) audioData.bars[i] = 0;
         }
 
-        // Volume (Große VU Meter) Smoothing
+        // Volume (Large VU Meter) Smoothing
         let rawL = (parsed.volL !== undefined) ? parsed.volL : 0;
         let rawR = (parsed.volR !== undefined) ? parsed.volR : 0;
         
@@ -681,7 +686,7 @@ function addLog(lvl, msg) {
 }
 function saveSettings() {
     if(window.pywebview) {
-        // Werte aus dem DOM lesen
+        // Read values from DOM
         const pEnabled = document.getElementById('particle').checked;
         const pThresh = document.getElementById('particle-threshold').value;
         const pInt = document.getElementById('particle-intensity').value;
@@ -693,31 +698,30 @@ function saveSettings() {
             bassRangeSetting, 
             bassOffsetSetting,
             bassSensSetting,
-            // --- NEU SENDEN ---
+            // Send new values
             pEnabled,
             pThresh,
             pInt
         );
-        addLog('INFO', 'Gespeichert.');
-        // ... button animation ...
+        addLog('INFO', 'Settings saved.');
     }
 }
 function setStatus(txt) { document.getElementById('status').innerText = txt; }
 
 window.addEventListener('keydown', (e) => {
-    // Speichern (Strg + S)
+    // Save (Ctrl + S)
     if (e.ctrlKey && e.key.toLowerCase() === 's') { 
         e.preventDefault(); 
         saveSettings(); 
     }
     
-    // Log Konsole (Strg + E)
+    // Log Console (Ctrl + E)
     if (e.ctrlKey && e.key.toLowerCase() === 'e') { 
         e.preventDefault(); 
         document.getElementById('console-overlay').style.display = 'flex'; 
     }
 
-    // Vollbild (F11)
+    // Fullscreen (F11)
     if (e.key === 'F11') {
         e.preventDefault(); 
         if(window.pywebview) {
