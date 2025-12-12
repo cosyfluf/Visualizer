@@ -488,15 +488,12 @@ const renderers = {
     'led':  (typeof LedRenderer !== 'undefined')  ? new LedRenderer() : new DummyRenderer(),
     'vu':   (typeof VuRenderer !== 'undefined')   ? new VuRenderer() : new DummyRenderer(),
     'magiceye': (typeof MagicEyeRenderer !== 'undefined') ? new MagicEyeRenderer() : new DummyRenderer(),
-    
-    // Classes defined in this file
     'synthwave': new SynthwaveRenderer(),
     'HoloRenderer': new HoloOrbRenderer(),
     'nyancat': new NyanCatRenderer(),
-
-    // Class from styles/laser.js
     'lasershow': (typeof LaserShowRenderer !== 'undefined') ? new LaserShowRenderer() : new DummyRenderer(),
-    'metal': (typeof MetalShowRenderer !== 'undefined') ? new MetalShowRenderer() : new DummyRenderer()
+    'metal': (typeof MetalShowRenderer !== 'undefined') ? new MetalShowRenderer() : new DummyRenderer(),
+	'FractalOscilloscope': (typeof FractalOscilloscopeRenderer !== 'undefined') ? new FractalOscilloscopeRenderer() : new DummyRenderer(),
 };
 
 let currentRenderer = renderers['HoloRenderer'];
