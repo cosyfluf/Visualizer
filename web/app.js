@@ -494,6 +494,10 @@ const renderers = {
     'lasershow': (typeof LaserShowRenderer !== 'undefined') ? new LaserShowRenderer() : new DummyRenderer(),
     'metal': (typeof MetalShowRenderer !== 'undefined') ? new MetalShowRenderer() : new DummyRenderer(),
 	'FractalOscilloscope': (typeof FractalOscilloscopeRenderer !== 'undefined') ? new FractalOscilloscopeRenderer() : new DummyRenderer(),
+    'Dubstep': (typeof DubstepShowRenderer !== 'undefined') ? new DubstepShowRenderer() : new DummyRenderer(),
+     'amp': (typeof AmpShowRenderer !== 'undefined') ? new AmpShowRenderer() : new DummyRenderer(),
+     'lemontree': (typeof LemonTreeRenderer !== 'undefined') ? new LemonTreeRenderer() : new DummyRenderer()
+
 };
 
 let currentRenderer = renderers['HoloRenderer'];

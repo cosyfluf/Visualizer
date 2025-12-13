@@ -1,3 +1,4 @@
+
 // --- START OF FILE styles/metal.js ---
 
 class MetalShowRenderer {
