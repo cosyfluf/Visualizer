@@ -1,6 +1,6 @@
 {
     "device_id": 6,
-    "style": "HoloRenderer",
+    "style": "FractalOscilloscope",
     "sensitivity": 0.1,
     "media_position": "bottom-left",
     "bass_range": 1,
