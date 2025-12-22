@@ -1,0 +1,4 @@
+numpy
+SoundCard
+pywebview
+winsdk

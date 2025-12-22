@@ -1,0 +1,12 @@
+{
+    "device_id": 6,
+    "style": "background",
+    "sensitivity": 0.1,
+    "media_position": "top-left",
+    "bass_range": 5,
+    "bass_offset": 0,
+    "bass_sens": 1.2,
+    "particle_enabled": true,
+    "particle_threshold": 20,
+    "particle_intensity": 50
+}
