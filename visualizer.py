@@ -185,7 +185,6 @@ class JsApi:
                 return json.load(f)
         except:
             return None
-    # In visualizer.py in der Klasse JsApi hinzufügen:
 
     def save_custom_theme(self, name, block_data):
         try:
@@ -208,6 +207,15 @@ class JsApi:
             with open(f"web/editor/custom/{name}.json", 'r') as f:
                 return json.load(f)
         except: return None    
+    def get_static_images(self):
+        try:
+            folder = "web/editor/custom/static"
+            if not os.path.exists(folder): os.makedirs(folder)
+            # supported formats
+            extensions = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+            return [f for f in os.listdir(folder) if f.lower().endswith(extensions)]
+        except:
+            return []    
 
 # ==========================================
 # AUDIO ENGINE (High Performance / Low Latency)

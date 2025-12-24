@@ -32,17 +32,23 @@ function resize() {
 function draw() {
     requestAnimationFrame(draw);
     
-    // ZUERST: Custom-Logik berechnen
     if (currentCustomLogic) {
         processCustomLogic(audioData);
     }
 
+    // Löschen
+    if (currentStyleName !== 'oscilloscopemusic') {
+        ctx.clearRect(0, 0, width, height);
+    }
+
+    // --- REIHENFOLGE DER LAYER ---
+    // 1. Custom Backgrounds/Bilder (Unten)
+    if (typeof drawCustomLayers === 'function') {
+        drawCustomLayers(ctx, width, height);
+    }
+
+    // 2. Aktueller Visualizer Style (Mitte)
     if(currentRenderer) {
-        if (currentStyleName !== 'oscilloscopemusic') {
-             ctx.clearRect(0, 0, width, height);
-        }
-        
-        // Renderer zeichnen
         currentRenderer.draw(ctx, width, height, audioData);
     }
 }

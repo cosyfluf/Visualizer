@@ -1,128 +1,293 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Theme Editor</title>
+    <meta charset="UTF-8">
+    <title>Pro Visualizer - Theme Editor</title>
     <style>
-        body { background: #111; color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; }
-        .header { background: #222; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0078d7; }
+        :root {
+            --bg: #1e1e1e;
+            --sidebar: #252526;
+            --accent: #007acc;
+            --event: #ffab19;
+            --action: #4c97ff;
+            --visuals: #9966ff;
+            --text: #ffffff;
+        }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Toolbar */
+        .toolbar { background: #333; padding: 10px 20px; display: flex; align-items: center; gap: 20px; border-bottom: 1px solid #444; z-index: 100; }
+        .btn { background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn:hover { filter: brightness(1.2); }
+        .btn-back { background: #555; text-decoration: none; font-size: 14px; padding: 8px 16px; border-radius: 4px; color: white; }
+        .undo-hint { font-size: 11px; color: #888; margin-left: auto; }
+
         .main { display: flex; flex: 1; overflow: hidden; }
+
+        /* Blocks Palette */
+        .palette { width: 280px; background: var(--sidebar); border-right: 1px solid #444; padding: 15px; overflow-y: auto; }
+        .category-title { font-size: 11px; text-transform: uppercase; color: #888; margin: 15px 0 10px 0; letter-spacing: 1px; }
         
-        .palette { width: 250px; background: #1a1a1a; padding: 15px; border-right: 1px solid #333; }
-        .workspace { flex: 1; background: #111; padding: 20px; position: relative; overflow-y: auto; }
-        .preview-panel { width: 300px; background: #1a1a1a; border-left: 1px solid #333; padding: 15px; }
-        
-        .block { 
-            background: #0078d7; padding: 10px; border-radius: 4px; margin-bottom: 10px; cursor: pointer;
-            border-left: 5px solid #005a9e; user-select: none; font-size: 13px;
+        .block {
+            padding: 10px; margin-bottom: 8px; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: transform 0.1s;
         }
-        .block.event { background: #e81123; border-color: #a80000; }
-        .block.action { background: #107c10; border-color: #0b5a0b; }
-        
-        .workspace-block {
-            background: #333; margin-bottom: 5px; padding: 10px; border-radius: 4px;
-            display: flex; align-items: center; gap: 10px; border-left: 5px solid #555;
+        .block:active { transform: scale(0.95); }
+        .block-event { background: var(--event); color: #000; }
+        .block-action { background: var(--action); }
+        .block-visual { background: var(--visuals); }
+
+        /* Image Browser */
+        #image-browser { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; 
+            background: #151515; padding: 8px; border-radius: 6px; margin-top: 5px;
         }
+        .img-item { 
+            background: #333; padding: 5px; border-radius: 4px; cursor: pointer; font-size: 10px; text-align: center;
+            border: 1px solid transparent;
+        }
+        .img-item:hover { border-color: var(--accent); }
+        .img-item img { width: 100%; height: 40px; object-fit: contain; pointer-events: none; }
+        .img-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+
+        /* Workspace */
+        .workspace { flex: 1; background: #111; padding: 30px; overflow-y: auto; position: relative; }
+        .chain-connector { width: 20px; height: 10px; background: #333; margin-left: 20px; border-radius: 0 0 4px 4px; }
         
-        input, select { background: #222; color: white; border: 1px solid #444; padding: 3px; }
-        .btn { padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-save { background: #107c10; color: white; }
-        .btn-back { background: #444; color: white; text-decoration: none; font-size: 12px; }
+        .placed-block {
+            width: 400px; padding: 12px; border-radius: 8px; margin-bottom: 4px;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px; position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .placed-block input, .placed-block select {
+            background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);
+            color: white; border-radius: 4px; padding: 3px; font-size: 12px;
+        }
+
+        /* Preview Box */
+        .preview-box { width: 320px; background: var(--sidebar); border-left: 1px solid #444; padding: 15px; display: flex; flex-direction: column; }
+        #canvas-preview { width: 100%; height: 180px; background: #000; border-radius: 8px; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div>
-            <a href="../index.html" class="btn-back">← Back</a>
-            <span style="margin-left:20px;">Theme Creator</span>
-        </div>
-        <div>
-            <input type="text" id="theme-name" placeholder="Theme Name..." value="MyNewTheme">
-            <button class="btn btn-save" onclick="saveTheme()">Save Theme</button>
-        </div>
-    </div>
 
-    <div class="main">
-        <div class="palette">
-            <h3>Events</h3>
-            <div class="block event" onclick="addBlock('on_bass')">On Bass Hit</div>
-            <div class="block event" onclick="addBlock('on_beat')">On Beat</div>
-            
-            <h3>Actions</h3>
-            <div class="block action" onclick="addBlock('move_obj')">Move Object</div>
-            <div class="block action" onclick="addBlock('change_color')">Change Color</div>
-            <div class="block action" onclick="addBlock('reset')">Return to Origin</div>
-        </div>
+<div class="toolbar">
+    <a href="../index.html" class="btn-back">← Back</a>
+    <input type="text" id="theme-name" placeholder="Theme Name..." value="MyTheme" style="background:#444; border:1px solid #555; color:white; padding:8px; border-radius:4px; width: 150px;">
+    <button class="btn" onclick="saveTheme()">Save Theme</button>
+    <div class="undo-hint">Press <b>CTRL + Z</b> to undo changes</div>
+</div>
 
-        <div class="workspace" id="workspace">
-            <p style="color: #666;">Click blocks on the left to build your logic chain...</p>
-        </div>
+<div class="main">
+    <!-- Sidebar -->
+    <div class="palette">
+        <div class="category-title">Events</div>
+        <div class="block block-event" onclick="addBlock('on_bass')">When Bass Hits</div>
+        <div class="block block-event" onclick="addBlock('on_beat')">Every Beat</div>
 
-        <div class="preview-panel">
-            <h3>Live Preview</h3>
-            <div id="preview-canvas" style="width:100%; height:200px; background:#000; border:1px solid #333;"></div>
-            <p style="font-size: 11px; color: #888;">(Preview simulates bass hits every 2 seconds)</p>
-            <hr>
-            <h4>Object IDs</h4>
-            <ul style="font-size:12px; color:#aaa;">
-                <li><b>main_circle</b> (Central Circle)</li>
-                <li><b>bg_glow</b> (Background)</li>
-                <li><b>bars</b> (Audio Spectrum)</li>
-            </ul>
+        <div class="category-title">Visuals & Media</div>
+        <div class="block block-visual" onclick="addBlock('set_bg')">Set Background</div>
+        <div class="block block-visual" onclick="addBlock('add_img')">Add Image Obj</div>
+
+        <div class="category-title">Actions</div>
+        <div class="block block-action" onclick="addBlock('move_obj')">Move [Object]</div>
+        <div class="block block-action" onclick="addBlock('shake')">Shake Everything</div>
+        <div class="block block-action" onclick="addBlock('reset')">Reset Positions</div>
+
+        <div class="category-title">Available Images (/static)</div>
+        <div id="image-browser">
+            <div style="grid-column: span 2; font-size: 10px; color: #666; text-align: center;">Loading images...</div>
         </div>
     </div>
 
-    <script>
-        let workspaceBlocks = [];
+    <!-- Center -->
+    <div class="workspace" id="workspace">
+        <!-- Blocks appear here -->
+    </div>
 
-        function addBlock(type) {
-            const id = Date.now();
-            workspaceBlocks.push({ id, type, params: {} });
-            renderWorkspace();
+    <!-- Right -->
+    <div class="preview-box">
+        <div class="category-title">Mockup Preview</div>
+        <canvas id="canvas-preview"></canvas>
+        <div style="font-size:11px; color:#888; margin-top:15px; line-height: 1.6;">
+            <b>Instructions:</b><br>
+            1. Drag images into the <b>Add Image</b> block filenames.<br>
+            2. Animate objects by targeting their <b>ID</b>.<br>
+            3. IDs <code>main_circle</code> and <code>background</code> are always available.
+        </div>
+    </div>
+</div>
+
+<script>
+    let blocks = [];
+    let history = []; // Undo stack
+
+    // --- UNDO SYSTEM ---
+    function saveState() {
+        if (history.length > 30) history.shift(); // Limit history size
+        history.push(JSON.stringify(blocks));
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            undo();
         }
+    });
 
-        function removeBlock(id) {
-            workspaceBlocks = workspaceBlocks.filter(b => b.id !== id);
-            renderWorkspace();
+    function undo() {
+        if (history.length > 0) {
+            blocks = JSON.parse(history.pop());
+            render(false); // Render without saving to history
         }
+    }
 
-        function renderWorkspace() {
-            const ws = document.getElementById('workspace');
-            ws.innerHTML = "";
-            workspaceBlocks.forEach(b => {
-                const div = document.createElement('div');
-                div.className = "workspace-block";
-                
-                let controls = "";
-                if(b.type === 'move_obj') {
-                    controls = `Target: <input onchange="updateParam(${b.id}, 'target', this.value)" placeholder="main_circle"> 
-                                X: <input type="number" onchange="updateParam(${b.id}, 'x', this.value)" style="width:40px">`;
-                } else if(b.type === 'change_color') {
-                    controls = `Color: <input type="color" onchange="updateParam(${b.id}, 'color', this.value)">`;
-                }
-
-                div.innerHTML = `<strong>${b.type.toUpperCase()}</strong> ${controls} 
-                                 <button onclick="removeBlock(${b.id})" style="margin-left:auto; background:red; border:none; color:white;">X</button>`;
-                ws.appendChild(div);
-            });
-        }
-
-        function updateParam(id, key, val) {
-            const b = workspaceBlocks.find(x => x.id === id);
-            if(b) b.params[key] = val;
-        }
-
-        async function saveTheme() {
-            const name = document.getElementById('theme-name').value;
-            if(!name) return alert("Please enter a name");
-            
-            if(window.pywebview) {
-                const success = await pywebview.api.save_custom_theme(name, workspaceBlocks);
-                if(success) alert("Theme Saved!");
-            } else {
-                console.log("Saving...", name, workspaceBlocks);
-                alert("Running in browser - check console for JSON");
+    // --- IMAGE LOADING ---
+    async function loadImages() {
+        if (window.pywebview && window.pywebview.api) {
+            const imgs = await pywebview.api.get_static_images();
+            const container = document.getElementById('image-browser');
+            if (imgs.length === 0) {
+                container.innerHTML = "<div style='grid-column: span 2; font-size:10px; color:#666;'>No images in /static</div>";
+                return;
             }
+            container.innerHTML = imgs.map(img => `
+                <div class="img-item" onclick="copyToClipboard('${img}')" title="Click to copy name">
+                    <img src="custom/static/${img}">
+                    <div class="img-name">${img}</div>
+                </div>
+            `).join('');
         }
-    </script>
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text);
+        // Visual feedback would go here
+    }
+
+    // --- BLOCK LOGIC ---
+    function addBlock(type) {
+        saveState();
+        const id = Date.now();
+        let newBlock = { id, type, params: {} };
+        
+        // Define default parameters
+        switch(type) {
+            case 'on_bass': break;
+            case 'set_bg': newBlock.params = { url: '' }; break;
+            case 'add_img': newBlock.params = { id: 'img1', url: '', x: 50, y: 50, scale: 0.5 }; break;
+            case 'move_obj': newBlock.params = { target: 'img1', x: 0, y: -10 }; break;
+            case 'reset': break;
+            case 'shake': break;
+        }
+        
+        blocks.push(newBlock);
+        render();
+    }
+
+    function updateParam(id, key, val) {
+        // Save state before changing a parameter for undo
+        let b = blocks.find(x => x.id === id);
+        if(b && b.params[key] !== val) {
+            saveState();
+            b.params[key] = val;
+        }
+    }
+
+    function removeBlock(id) {
+        saveState();
+        blocks = blocks.filter(x => x.id !== id);
+        render();
+    }
+
+    // --- RENDER WORKSPACE ---
+    function render(shouldUpdatePreview = true) {
+        const ws = document.getElementById('workspace');
+        ws.innerHTML = (blocks.length === 0) ? 
+            `<div style="color:#444; text-align:center; margin-top:50px;">Workspace Empty. Click blocks on the left.</div>` : "";
+        
+        blocks.forEach((b, index) => {
+            const div = document.createElement('div');
+            let categoryClass = "block-action";
+            if(b.type.startsWith('on_')) categoryClass = "block-event";
+            if(['set_bg', 'add_img'].includes(b.type)) categoryClass = "block-visual";
+
+            div.className = `placed-block ${categoryClass}`;
+            
+            let html = `<span style="opacity:0.5; font-size:10px; width:15px;">${index+1}</span> `;
+            
+            // Generate dynamic inputs based on block type
+            if(b.type === 'on_bass') html += `<b>When Bass Hits</b>`;
+            if(b.type === 'on_beat') html += `<b>Every Beat</b>`;
+            
+            if(b.type === 'set_bg') {
+                html += `Set Background to File: <input placeholder="bg.jpg" value="${b.params.url || ''}" onchange="updateParam(${b.id}, 'url', this.value)">`;
+            }
+            if(b.type === 'add_img') {
+                html += `Add Image ID: <input style="width:50px" value="${b.params.id}" onchange="updateParam(${b.id}, 'id', this.value)"> 
+                         File: <input placeholder="logo.png" style="width:80px" value="${b.params.url}" onchange="updateParam(${b.id}, 'url', this.value)">
+                         Scale: <input type="number" step="0.1" style="width:40px" value="${b.params.scale}" onchange="updateParam(${b.id}, 'scale', this.value)">`;
+            }
+            if(b.type === 'move_obj') {
+                html += `Move <input style="width:60px" value="${b.params.target}" onchange="updateParam(${b.id}, 'target', this.value)"> 
+                         X: <input type="number" style="width:40px" value="${b.params.x || 0}" onchange="updateParam(${b.id}, 'x', this.value)"> 
+                         Y: <input type="number" style="width:40px" value="${b.params.y || 0}" onchange="updateParam(${b.id}, 'y', this.value)">`;
+            }
+            if(b.type === 'shake') html += `Shake Screen`;
+            if(b.type === 'reset') html += `Reset all positions`;
+
+            html += `<button onclick="removeBlock(${b.id})" style="margin-left:auto; background:rgba(0,0,0,0.2); border:none; color:white; cursor:pointer; border-radius:50%; width:24px; height:24px;">×</button>`;
+            
+            div.innerHTML = html;
+            ws.appendChild(div);
+            
+            if(index < blocks.length - 1) {
+                const conn = document.createElement('div');
+                conn.className = "chain-connector";
+                ws.appendChild(conn);
+            }
+        });
+
+        if(shouldUpdatePreview) updatePreview();
+    }
+
+    // --- PREVIEW CANVAS (Static Placeholder) ---
+    function updatePreview() {
+        const canvas = document.getElementById('canvas-preview');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = "#333";
+        ctx.textAlign = "center";
+        ctx.font = "10px sans-serif";
+        ctx.fillText("Real-time preview requires live audio.", canvas.width/2, canvas.height/2);
+    }
+
+    // --- SAVE TO BACKEND ---
+    async function saveTheme() {
+        const name = document.getElementById('theme-name').value;
+        if(!name) return alert("Please enter a theme name!");
+        
+        if(window.pywebview && window.pywebview.api) {
+            const success = await pywebview.api.save_custom_theme(name, blocks);
+            if(success) alert("Theme '" + name + "' saved successfully!");
+            else alert("Failed to save theme.");
+        } else {
+            console.log("JSON:", JSON.stringify(blocks));
+            alert("Not connected to Python. Check console for JSON.");
+        }
+    }
+
+    // --- INIT ---
+    window.onload = () => {
+        loadImages();
+        const canvas = document.getElementById('canvas-preview');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        updatePreview();
+    };
+</script>
+
 </body>
 </html>
