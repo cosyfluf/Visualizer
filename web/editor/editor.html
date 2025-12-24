@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Theme Editor</title>
+    <style>
+        body { background: #111; color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+        .header { background: #222; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0078d7; }
+        .main { display: flex; flex: 1; overflow: hidden; }
+        
+        .palette { width: 250px; background: #1a1a1a; padding: 15px; border-right: 1px solid #333; }
+        .workspace { flex: 1; background: #111; padding: 20px; position: relative; overflow-y: auto; }
+        .preview-panel { width: 300px; background: #1a1a1a; border-left: 1px solid #333; padding: 15px; }
+        
+        .block { 
+            background: #0078d7; padding: 10px; border-radius: 4px; margin-bottom: 10px; cursor: pointer;
+            border-left: 5px solid #005a9e; user-select: none; font-size: 13px;
+        }
+        .block.event { background: #e81123; border-color: #a80000; }
+        .block.action { background: #107c10; border-color: #0b5a0b; }
+        
+        .workspace-block {
+            background: #333; margin-bottom: 5px; padding: 10px; border-radius: 4px;
+            display: flex; align-items: center; gap: 10px; border-left: 5px solid #555;
+        }
+        
+        input, select { background: #222; color: white; border: 1px solid #444; padding: 3px; }
+        .btn { padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-save { background: #107c10; color: white; }
+        .btn-back { background: #444; color: white; text-decoration: none; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <a href="../index.html" class="btn-back">← Back</a>
+            <span style="margin-left:20px;">Theme Creator</span>
+        </div>
+        <div>
+            <input type="text" id="theme-name" placeholder="Theme Name..." value="MyNewTheme">
+            <button class="btn btn-save" onclick="saveTheme()">Save Theme</button>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="palette">
+            <h3>Events</h3>
+            <div class="block event" onclick="addBlock('on_bass')">On Bass Hit</div>
+            <div class="block event" onclick="addBlock('on_beat')">On Beat</div>
+            
+            <h3>Actions</h3>
+            <div class="block action" onclick="addBlock('move_obj')">Move Object</div>
+            <div class="block action" onclick="addBlock('change_color')">Change Color</div>
+            <div class="block action" onclick="addBlock('reset')">Return to Origin</div>
+        </div>
+
+        <div class="workspace" id="workspace">
+            <p style="color: #666;">Click blocks on the left to build your logic chain...</p>
+        </div>
+
+        <div class="preview-panel">
+            <h3>Live Preview</h3>
+            <div id="preview-canvas" style="width:100%; height:200px; background:#000; border:1px solid #333;"></div>
+            <p style="font-size: 11px; color: #888;">(Preview simulates bass hits every 2 seconds)</p>
+            <hr>
+            <h4>Object IDs</h4>
+            <ul style="font-size:12px; color:#aaa;">
+                <li><b>main_circle</b> (Central Circle)</li>
+                <li><b>bg_glow</b> (Background)</li>
+                <li><b>bars</b> (Audio Spectrum)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let workspaceBlocks = [];
+
+        function addBlock(type) {
+            const id = Date.now();
+            workspaceBlocks.push({ id, type, params: {} });
+            renderWorkspace();
+        }
+
+        function removeBlock(id) {
+            workspaceBlocks = workspaceBlocks.filter(b => b.id !== id);
+            renderWorkspace();
+        }
+
+        function renderWorkspace() {
+            const ws = document.getElementById('workspace');
+            ws.innerHTML = "";
+            workspaceBlocks.forEach(b => {
+                const div = document.createElement('div');
+                div.className = "workspace-block";
+                
+                let controls = "";
+                if(b.type === 'move_obj') {
+                    controls = `Target: <input onchange="updateParam(${b.id}, 'target', this.value)" placeholder="main_circle"> 
+                                X: <input type="number" onchange="updateParam(${b.id}, 'x', this.value)" style="width:40px">`;
+                } else if(b.type === 'change_color') {
+                    controls = `Color: <input type="color" onchange="updateParam(${b.id}, 'color', this.value)">`;
+                }
+
+                div.innerHTML = `<strong>${b.type.toUpperCase()}</strong> ${controls} 
+                                 <button onclick="removeBlock(${b.id})" style="margin-left:auto; background:red; border:none; color:white;">X</button>`;
+                ws.appendChild(div);
+            });
+        }
+
+        function updateParam(id, key, val) {
+            const b = workspaceBlocks.find(x => x.id === id);
+            if(b) b.params[key] = val;
+        }
+
+        async function saveTheme() {
+            const name = document.getElementById('theme-name').value;
+            if(!name) return alert("Please enter a name");
+            
+            if(window.pywebview) {
+                const success = await pywebview.api.save_custom_theme(name, workspaceBlocks);
+                if(success) alert("Theme Saved!");
+            } else {
+                console.log("Saving...", name, workspaceBlocks);
+                alert("Running in browser - check console for JSON");
+            }
+        }
+    </script>
+</body>
+</html>

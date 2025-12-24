@@ -1,8 +1,3 @@
-// --- START OF FILE app.js ---
-
-// ==========================================
-// 1. INLINE RENDERER CLASSES
-// ==========================================
 class SynthwaveRenderer {
     constructor() {
         this.offset = 0; 
@@ -168,8 +163,6 @@ class SynthwaveRenderer {
         ctx.restore();
     }
 }
-
-// --- HYBRID SCOPE: REAL XY (Hardware) OR WAVEFORM (Simulation) ---
 class OscilloscopeXYRenderer {
     constructor() {
         this.beamColor = "#50ff64"; 
@@ -269,15 +262,6 @@ class OscilloscopeXYRenderer {
         ctx.globalCompositeOperation = 'source-over';
         ctx.shadowBlur = 0;
     }
-}
-// Global variable for custom logic
-let currentCustomLogic = null;
-let customVars = { x: 0, y: 0, color: '#0078d7' };
-
-// Function to switch to a custom theme
-async function loadCustomTheme(name) {
-    const themeName = name.replace('custom_', '');
-    currentCustomLogic = await pywebview.api.load_custom_theme(themeName);
 }
 class HoloOrbRenderer {
     constructor() {
@@ -554,44 +538,7 @@ class NyanCatRenderer {
     }
 }
 
-// ==========================================
-// 2. MAIN LOGIC & SETUP
-// ==========================================
-
-const canvas = document.getElementById('viz');
-const ctx = canvas.getContext('2d');
-let width, height;
-
-// State
-let sensitivity = 1.0;
-let currentStyleName = 'neon';
-let mediaPosition = 'top-left';
-let bassRangeSetting = 5;
-let bassOffsetSetting = 0;
-let bassSensSetting = 1.2; 
-
-// Data Object for Renderers
-let audioData = { 
-    bars: new Array(64).fill(0), 
-    volL: 0, 
-    volR: 0, 
-    config: { bassRange: 5, bassOffset: 0, bassSens: 1.2 } 
-};
-
-function resize() {
-    width = canvas.offsetWidth;
-    height = canvas.offsetHeight;
-    canvas.width = width;
-    canvas.height = height;
-}
-
-window.addEventListener('resize', resize);
-resize();
-
-// Fallback Renderers
-class DummyRenderer { draw(ctx){} }
-
-// RENDERER REGISTRATION
+// Registrierung aller verfügbaren Renderer
 const renderers = {
     'neon': (typeof NeonRenderer !== 'undefined') ? new NeonRenderer() : new DummyRenderer(),
     'kitt': (typeof KittRenderer !== 'undefined') ? new KittRenderer() : new DummyRenderer(),
@@ -603,336 +550,16 @@ const renderers = {
     'nyancat': new NyanCatRenderer(),
     'lasershow': (typeof LaserShowRenderer !== 'undefined') ? new LaserShowRenderer() : new DummyRenderer(),
     'metal': (typeof MetalShowRenderer !== 'undefined') ? new MetalShowRenderer() : new DummyRenderer(),
-	'FractalOscilloscope': (typeof FractalOscilloscopeRenderer !== 'undefined') ? new FractalOscilloscopeRenderer() : new DummyRenderer(),
+    'FractalOscilloscope': (typeof FractalOscilloscopeRenderer !== 'undefined') ? new FractalOscilloscopeRenderer() : new DummyRenderer(),
     'Dubstep': (typeof DubstepShowRenderer !== 'undefined') ? new DubstepShowRenderer() : new DummyRenderer(),
-     'amp': (typeof AmpShowRenderer !== 'undefined') ? new AmpShowRenderer() : new DummyRenderer(),
-     'lemontree': (typeof LemonTreeRenderer !== 'undefined') ? new LemonTreeRenderer() : new DummyRenderer(),
-     'deepsea': (typeof DeepSeaRenderer !== 'undefined') ? new DeepSeaRenderer() : new DummyRenderer(),
-     'scope': (typeof PamegScopeRenderer !== 'undefined') ? new PamegScopeRenderer() : new DummyRenderer(),
-     'wave': (typeof NeonWaveRenderer !== 'undefined') ? new NeonWaveRenderer() : new DummyRenderer(),
-     'oscilloscopemusic': new OscilloscopeXYRenderer(),
-     'metalconcert': (typeof MetalConcertRenderer !== 'undefined') ? new MetalConcertRenderer() : new DummyRenderer(),
-     'background': (typeof BackgroundRenderer !== 'undefined') ? new BackgroundRenderer() : new DummyRenderer(),
-     
+    'amp': (typeof AmpShowRenderer !== 'undefined') ? new AmpShowRenderer() : new DummyRenderer(),
+    'lemontree': (typeof LemonTreeRenderer !== 'undefined') ? new LemonTreeRenderer() : new DummyRenderer(),
+    'deepsea': (typeof DeepSeaRenderer !== 'undefined') ? new DeepSeaRenderer() : new DummyRenderer(),
+    'scope': (typeof PamegScopeRenderer !== 'undefined') ? new PamegScopeRenderer() : new DummyRenderer(),
+    'wave': (typeof NeonWaveRenderer !== 'undefined') ? new NeonWaveRenderer() : new DummyRenderer(),
+    'oscilloscopemusic': new OscilloscopeXYRenderer(),
+    'metalconcert': (typeof MetalConcertRenderer !== 'undefined') ? new MetalConcertRenderer() : new DummyRenderer(),
+    'background': (typeof BackgroundRenderer !== 'undefined') ? new BackgroundRenderer() : new DummyRenderer(),
 };
 
-
-
-let currentRenderer = renderers['HoloRenderer'];
-
-// --- HERTZ CALCULATOR ---
-function calculateHz(barIndex) {
-    if(barIndex < 0) barIndex = 0;
-    if(barIndex > 64) barIndex = 64;
-    let hz = 30 * Math.pow((15000 / 30), (barIndex / 64));
-    return Math.round(hz);
-}
-
-// --- AUDIO SETUP (Web Audio API) ---
-function initAudio() {
-    if (audioCtx) return; // Nur einmal starten
-
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-
-        // Zugriff auf Audio-Input (Mikrofon oder Stereomix, je nach Browser/System)
-        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-        .then(stream => {
-            source = audioCtx.createMediaStreamSource(stream);
-            
-            // Stereo Splitter erstellen
-            splitter = audioCtx.createChannelSplitter(2);
-            
-            analyserL = audioCtx.createAnalyser();
-            analyserR = audioCtx.createAnalyser();
-            
-            // Hohe Auflösung für Oszilloskop
-            analyserL.fftSize = 4096; 
-            analyserR.fftSize = 4096;
-            
-            // Verkabeln: Source -> Splitter -> Analysers
-            source.connect(splitter);
-            splitter.connect(analyserL, 0); // Links
-            splitter.connect(analyserR, 1); // Rechts
-            
-            // Arrays initialisieren (Damit der Renderer darauf zugreifen kann)
-            dataArrayL = new Uint8Array(analyserL.frequencyBinCount);
-            dataArrayR = new Uint8Array(analyserR.frequencyBinCount);
-            
-            addLog("INFO", "Audio Engine started.");
-        })
-        .catch(err => {
-            addLog("ERROR", "Audio Init Failed: " + err);
-        });
-    } catch(e) {
-        addLog("ERROR", "Web Audio API not supported.");
-    }
-}
-
-function updateHzDisplay() {
-    let startIdx = parseInt(bassOffsetSetting);
-    let endIdx = startIdx + parseInt(bassRangeSetting);
-    let startHz = calculateHz(startIdx);
-    let endHz = calculateHz(endIdx);
-    document.getElementById('hz-display').innerText = `${startHz} Hz - ${endHz} Hz`;
-}
-
-// --- UPDATES ---
-function changeStyle(name) {
-    if(renderers[name]) {
-        currentStyleName = name;
-        currentRenderer = renderers[name];
-        document.getElementById('style-select').value = name;
-        document.getElementById('container').style.webkitBoxReflect = 
-            (name === 'neon') ? 'below 0px linear-gradient(transparent, transparent, rgba(0,0,0,0.3))' : 'none';
-    } else {
-        addLog("ERROR", "Renderer not found: " + name);
-    }
-}
-
-function updateSens(val) { 
-    sensitivity = parseFloat(val); 
-    document.getElementById('sens-slider').value = val;
-}
-
-function updateMediaPos(pos) {
-    mediaPosition = pos;
-    const overlay = document.getElementById('media-overlay');
-    overlay.classList.remove('pos-tl', 'pos-tr', 'pos-bl', 'pos-br');
-    if(pos === 'top-left') overlay.classList.add('pos-tl');
-    if(pos === 'top-right') overlay.classList.add('pos-tr');
-    if(pos === 'bottom-left') overlay.classList.add('pos-bl');
-    if(pos === 'bottom-right') overlay.classList.add('pos-br');
-    document.getElementById('pos-select').value = pos;
-}
-
-function updateBassRange(val) {
-    bassRangeSetting = parseInt(val);
-    document.getElementById('bass-range-slider').value = val;
-    document.getElementById('bass-val-display').innerText = val;
-    audioData.config.bassRange = bassRangeSetting;
-    updateHzDisplay();
-}
-
-function updateBassOffset(val) {
-    bassOffsetSetting = parseInt(val);
-    document.getElementById('bass-offset-slider').value = val;
-    audioData.config.bassOffset = bassOffsetSetting;
-    updateHzDisplay();
-}
-
-function updateBassSens(val) {
-    bassSensSetting = parseFloat(val);
-    document.getElementById('bass-sens-slider').value = val;
-    document.getElementById('bass-sens-display').innerText = val;
-    audioData.config.bassSens = bassSensSetting;
-}
-
-// --- INIT & SAVE ---
-function applyConfig(style, sens, pos, bassRange, bassOffset, bassSens, pEnabled, pThresh, pInt) {
-    changeStyle(style);
-    updateSens(sens);
-    updateMediaPos(pos || 'top-left');
-    updateBassRange(bassRange || 5);
-    updateBassOffset(bassOffset || 0);
-    updateBassSens(bassSens || 1.2);
-
-    // Set Particle Values
-    // Toggle
-    const elToggle = document.getElementById('particle');
-    if(elToggle) elToggle.checked = pEnabled;
-    
-    // Threshold
-    const elThresh = document.getElementById('particle-threshold');
-    if(elThresh) {
-        elThresh.value = pThresh;
-        updateLabel('lbl-sthresh', pThresh);
-    }
-
-    // Intensity
-    const elInt = document.getElementById('particle-intensity');
-    if(elInt) {
-        elInt.value = pInt;
-        updateLabel('lbl-sint', pInt);
-    }
-    
-    addLog('INFO', `Config loaded.`);
-}
-
-// --- DATA LOOP ---
-function updateData(jsonStr) {
-    try {
-        const parsed = JSON.parse(jsonStr);
-        
-        // Physics Smoothing Loop
-        for(let i=0; i<64; i++) {
-            let target = parsed.bars[i] * sensitivity;
-            if(target > 100) target = 100;
-
-            // --- PHYSICS SETTINGS ---
-            let attack, decay;
-
-            // BASS METER Range (Index 0 to 8)
-            if (i < 8) { 
-                attack = 0.95;  
-                decay = 15.0;   
-            } 
-            // LOW MIDS (Transition)
-            else if (i < 20) {
-                attack = 0.5;
-                decay = 5.0;
-            } 
-            // HIGHS (Softer)
-            else {
-                attack = 0.3;   
-                decay = 2.0;    
-            }
-
-            // Calculate Physics
-            if(target > audioData.bars[i]) {
-                // Needle rises (Attack)
-                audioData.bars[i] += (target - audioData.bars[i]) * attack; 
-            } else {
-                // Needle falls (Decay)
-                audioData.bars[i] -= decay; 
-            }
-            
-            // Limit bottom
-            if(audioData.bars[i] < 0) audioData.bars[i] = 0;
-        }
-
-        // Volume (Large VU Meter) Smoothing
-        let rawL = (parsed.volL !== undefined) ? parsed.volL : 0;
-        let rawR = (parsed.volR !== undefined) ? parsed.volR : 0;
-        
-        audioData.volL += (rawL * sensitivity - audioData.volL) * 0.4;
-        audioData.volR += (rawR * sensitivity - audioData.volR) * 0.4;
-
-    } catch(e) { }
-}
-
-function updateMediaInfo(jsonStr) {
-    try {
-        const info = JSON.parse(jsonStr);
-        const overlay = document.getElementById('media-overlay');
-        if (info.title) {
-            document.getElementById('media-title').innerText = info.title;
-            document.getElementById('media-artist').innerText = info.artist || "";
-            const img = document.getElementById('media-cover');
-            if (info.cover) { img.src = info.cover; img.style.display = "block"; } 
-            else { img.style.display = "none"; }
-            overlay.style.opacity = 1;
-        } else { overlay.style.opacity = 0; }
-    } catch(e) {}
-}
-
-function draw() {
-    requestAnimationFrame(draw);
-    
-    // WICHTIG: clearRect entfernt! 
-    // Die Renderers kümmern sich jetzt selbst um den Hintergrund.
-    // Das Oszilloskop malt halb-transparentes Schwarz drüber für den Trail-Effekt.
-    
-    if(currentRenderer) {
-        // Falls ein Renderer Transparenz braucht (wie NyanCat), 
-        // kann er selbst clearRect aufrufen. Das Oszilloskop darf das aber nicht!
-        if (currentStyleName !== 'oscilloscopemusic') {
-             // Für alle anderen Themes löschen wir den Screen, damit es sauber bleibt
-             ctx.clearRect(0, 0, width, height);
-        }
-        
-        currentRenderer.draw(ctx, width, height, audioData);
-    }
-}
-draw();
-
-function toggleSettings() {
-    const m = document.getElementById('settings-modal');
-    m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
-}
-function addLog(lvl, msg) {
-    const row = document.createElement('div');
-    row.innerHTML = `<span style="color:${lvl==='ERROR'?'#f55':'#0f8'}">[${lvl}]</span> ${msg}`;
-    document.getElementById('console-body').appendChild(row);
-}
-function saveSettings() {
-    if(window.pywebview) {
-        // Read values from DOM
-        const pEnabled = document.getElementById('particle').checked;
-        const pThresh = document.getElementById('particle-threshold').value;
-        const pInt = document.getElementById('particle-intensity').value;
-
-        window.pywebview.api.save_settings(
-            currentStyleName, 
-            sensitivity, 
-            mediaPosition, 
-            bassRangeSetting, 
-            bassOffsetSetting,
-            bassSensSetting,
-            // Send new values
-            pEnabled,
-            pThresh,
-            pInt
-        );
-        addLog('INFO', 'Settings saved.');
-    }
-}
-function setStatus(txt) { document.getElementById('status').innerText = txt; }
-
-// --- EVENT LISTENERS ---
-
-// 1. Audio starten beim Klicken (Wichtig!)
-window.addEventListener('click', () => {
-    if (!audioCtx) initAudio();
-});
-
-// 2. Tastensteuerung
-window.addEventListener('keydown', (e) => {
-    // Save (Ctrl + S)
-    if (e.ctrlKey && e.key.toLowerCase() === 's') { 
-        e.preventDefault(); 
-        saveSettings(); 
-    }
-    
-    // Log Console (Ctrl + E)
-    if (e.ctrlKey && e.key.toLowerCase() === 'e') { 
-        e.preventDefault(); 
-        document.getElementById('console-overlay').style.display = 'flex'; 
-    }
-
-    // Fullscreen (F11)
-    if (e.key === 'F11') {
-        e.preventDefault(); 
-        if(window.pywebview) {
-            window.pywebview.api.toggle_fullscreen();
-        }
-    }
-});
-// --- AUTO START LOGIC ---
-
-// Versuch 1: Sofort beim Laden
-window.addEventListener('load', () => {
-    initAudio();
-});
-
-// Versuch 2: Ein Intervall, das prüft ob Audio läuft, und es erzwingt
-setInterval(() => {
-    if (currentStyleName === 'oscilloscopemusic') {
-        if (!audioCtx) {
-            initAudio();
-        } else if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-    }
-}, 1000);
-
-// Normale Event Listeners
-window.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveSettings(); }
-    if (e.ctrlKey && e.key.toLowerCase() === 'e') { e.preventDefault(); document.getElementById('console-overlay').style.display = 'flex'; }
-    if (e.key === 'F11') {
-        e.preventDefault(); 
-        if(window.pywebview) window.pywebview.api.toggle_fullscreen();
-    }
-});
+let currentRenderer = renderers['neon'];

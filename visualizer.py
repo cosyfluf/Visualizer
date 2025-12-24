@@ -135,6 +135,11 @@ def start_media_thread():
 # ==========================================
 # JS API
 # ==========================================
+# Create directory structure
+for path in ["web/editor/custom", "web/editor/custom/static"]:
+    if not os.path.exists(path):
+        os.makedirs(path)
+
 class JsApi:
     def toggle_fullscreen(self):
         global window
@@ -156,6 +161,53 @@ class JsApi:
             "particle_threshold": int(p_thresh),
             "particle_intensity": int(p_int)
         })
+    def save_custom_theme(self, name, block_data):
+        try:
+            file_path = f"web/editor/custom/{name}.json"
+            with open(file_path, 'w') as f:
+                json.dump(block_data, f, indent=4)
+            log_to_ui("INFO", f"Custom Theme '{name}' saved.")
+            return True
+        except Exception as e:
+            log_to_ui("ERROR", f"Save failed: {e}")
+            return False
+
+    def get_custom_themes(self):
+        try:
+            files = [f.replace('.json', '') for f in os.listdir("web/editor/custom") if f.endswith('.json')]
+            return files
+        except:
+            return []
+
+    def load_custom_theme(self, name):
+        try:
+            with open(f"web/editor/custom/{name}.json", 'r') as f:
+                return json.load(f)
+        except:
+            return None
+    # In visualizer.py in der Klasse JsApi hinzufügen:
+
+    def save_custom_theme(self, name, block_data):
+        try:
+            folder = "web/editor/custom"
+            if not os.path.exists(folder): os.makedirs(folder)
+            with open(f"{folder}/{name}.json", 'w') as f:
+                json.dump(block_data, f, indent=4)
+            return True
+        except: return False
+
+    def get_custom_themes(self):
+        try:
+            folder = "web/editor/custom"
+            if not os.path.exists(folder): return []
+            return [f.replace('.json', '') for f in os.listdir(folder) if f.endswith('.json')]
+        except: return []
+
+    def load_custom_theme(self, name):
+        try:
+            with open(f"web/editor/custom/{name}.json", 'r') as f:
+                return json.load(f)
+        except: return None    
 
 # ==========================================
 # AUDIO ENGINE (High Performance / Low Latency)
